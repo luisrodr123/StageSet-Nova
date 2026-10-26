@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#10141b" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <title>StageSet — palco</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="live-mode">
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="StageSet início">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+          <span class="brand-name">stage<span>set</span></span>
+        </a>
+        <div class="topbar-context">
+          <span class="eyebrow" id="mode-label">MODO LIVE</span>
+          <span class="context-divider"></span>
+          <span id="set-count">0 itens na coleção</span>
+        </div>
+        <div class="topbar-actions">
+          <details class="topbar-menu"><summary>Menu</summary><div class="topbar-menu-items">
+          <button class="backup-button" id="report-button" type="button" title="Imprimir ou exportar um relatório">Relatórios</button>
+          <button class="backup-button" id="setlist-save" type="button" data-studio-only title="Guardar setlist atual">Guardar setlist</button>
+          <button class="backup-button" id="setlist-load" type="button" data-studio-only title="Carregar setlist">Abrir setlist</button>
+          <input id="setlist-file" type="file" accept=".stagesetlist,.json,application/json" hidden />
+          <button class="backup-button" id="backup-export" type="button" data-studio-only title="Guardar o espetáculo completo, incluindo músicas e setlist">Guardar show</button>
+          <button class="backup-button" id="backup-restore" type="button" data-studio-only title="Abrir um espetáculo guardado">Abrir show</button>
+          <input id="backup-file" type="file" accept=".stagebackup,application/octet-stream" hidden />
+          </div></details>
+          <button class="backup-button mode-toggle" id="studio-mode-toggle" type="button" aria-pressed="false">Entrar no Studio</button>
+          <button class="icon-button" id="help-button" title="Atalhos de teclado" aria-label="Atalhos de teclado">?</button>
+          <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
+          <span class="connection-dot"></span>
+          <span class="status-label">PRONTO</span>
+          <span class="app-version" aria-label="Versão da aplicação">v0.6</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <section class="panel setlist-panel">
+            <div class="panel-heading compact-heading">
+              <div><span class="eyebrow">EM CENA</span><h2>Setlist <span class="heading-count" id="setlist-count">0</span></h2></div>
+              <div class="setlist-heading-actions" data-studio-only><button class="subtle-button" id="clear-played" title="Limpar marcas de músicas tocadas">Tocadas ✓</button><button class="subtle-button" id="clear-setlist" title="Limpar setlist">Limpar</button></div>
+            </div>
+            <div class="setlist-items" id="setlist-items"></div>
+            <div class="setlist-empty" id="setlist-empty">Adiciona músicas da biblioteca para montar a setlist.</div>
+            <div class="setlist-preferences" data-studio-only>
+              <label class="queue-hide-option"><input id="hide-setlist-during-playback" type="checkbox" /> Ocultar ao tocar</label>
+              <label class="queue-delay-option" for="inter-song-delay" title="0 segundos significa reprodução contínua">Intervalo
+                <input id="inter-song-delay" type="number" min="0" max="3600" step="1" inputmode="numeric" aria-label="Segundos entre músicas" /> s
+              </label>
+            </div>
+          </section>
+          <section class="panel library-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">A TUA MÚSICA</span>
+                <h1>Biblioteca</h1>
+              </div>
+              <div class="library-import-actions" data-studio-only>
+                <button class="round-add folder-add" id="add-folder" type="button" aria-label="Importar uma pasta" title="Importar uma pasta de música"><span class="folder-icon" aria-hidden="true"></span></button>
+                <button class="round-add" id="add-audio" type="button" aria-label="Importar faixas ou documentos" title="Importar áudio, MIDI, CD+G, PDF, RTF, TXT ou ZIP">+</button>
+                <input id="audio-files" type="file" accept="audio/*,.mogg,.mid,.midi,.kar,.cdg,.pdf,.rtf,.txt,.zip,application/zip" multiple hidden />
+                <input id="folder-files" type="file" accept="audio/*,.mogg,.mid,.midi,.kar,.cdg,.pdf,.rtf,.txt,.zip,application/zip" webkitdirectory directory multiple hidden />
+              </div>
+            </div>
+            <label class="search-box">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.8" cy="8.8" r="5.8"></circle><path d="m13.2 13.2 4 4"></path></svg>
+              <input id="search" type="search" placeholder="Pesquisar músicas" autocomplete="off" />
+              <kbd>/</kbd>
+            </label>
+            <div class="library-tools">
+              <select id="library-sort" aria-label="Ordenar biblioteca">
+                <option value="title">Título A–Z</option>
+                <option value="artist">Artista A–Z</option>
+                <option value="recent">Mais recentes</option>
+                <option value="played">Mais reproduzidas</option>
+              </select>
+              <button id="favorites-filter" class="library-filter" type="button" aria-pressed="false">★ Favoritas</button>
+              <button id="history-view" class="library-filter" type="button" aria-pressed="false">Histórico</button>
+            </div>
+            <div class="library-meta"><span>COLEÇÃO</span><span id="library-count">0</span></div>
+            <div class="song-library" id="song-library" aria-live="polite"></div>
+            <div class="empty-library" id="empty-library">
+              <div class="empty-icon">♫</div>
+              <strong>A tua coleção começa aqui</strong>
+              <span>Importa áudio, MIDI, karaoke ou partituras PDF, RTF e TXT.</span>
+              <button class="text-button" id="empty-add" data-studio-only>+ Importar ficheiros</button>
+            </div>
+          </section>
+
+          <footer class="sidebar-footer"><span class="footer-dot"></span> OS TEUS FICHEIROS FICAM NO TEU DISPOSITIVO</footer>
+        </aside>
+
+        <section class="stage panel" aria-label="Leitor e letras">
+          <div class="stage-topline">
+            <div class="live-label"><span class="live-pulse"></span><span>PALCO</span></div>
+            <details class="stage-functions"><summary>Funções</summary><div class="stage-tools">
+              <button class="stage-tool" id="lyrics-edit-button" data-studio-only title="Editar as letras da música selecionada"><span class="tool-glyph">✎</span><span>Editar letras</span></button>
+              <button class="stage-tool" id="pedal-button" data-studio-only title="Configurar pedais MIDI"><span class="tool-glyph">↯</span><span>Pedais</span></button>
+              <button class="stage-tool" id="midi-layer-button" data-studio-only title="Anexar uma faixa MIDI à música selecionada"><span class="tool-glyph">♫</span><span>MIDI mix</span></button>
+              <button class="stage-tool" id="timeline-editor-button" data-studio-only title="Abrir editor visual de áudio, MIDI e letras"><span class="tool-glyph">▤</span><span>Editor</span></button>
+              <input id="midi-layer-file" type="file" accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden />
+              <button class="stage-tool" id="midi-mixer-button" data-studio-only title="Misturar os canais da faixa MIDI" hidden><span class="tool-glyph">⚙</span><span>Mixer MIDI</span></button>
+              <button class="stage-tool" id="audio-mixer-button" data-studio-only title="Misturar os canais do ficheiro de áudio" hidden><span class="tool-glyph">▥</span><span>Mixer áudio</span></button>
+              <button class="stage-tool" id="audio-stems-button" data-studio-only title="Adicionar pistas de áudio ou importar um ZIP de stems do StemDeck" hidden><span class="tool-glyph">＋</span><span>Pistas</span></button>
+              <span class="lyric-size-tools" aria-label="Tamanho da letra do palco"><button class="stage-tool" id="lyric-size-down" type="button" title="Diminuir letra">A−</button><span id="lyric-size-label">100%</span><button class="stage-tool" id="lyric-size-up" type="button" title="Aumentar letra">A+</button></span>
+              <input id="audio-stems-files" type="file" accept="audio/*,.mogg,.zip" multiple hidden />
+              <button class="stage-tool" id="cdg-layer-button" data-studio-only title="Anexar um ficheiro CD+G à música selecionada"><span class="tool-glyph">▤</span><span>CD+G</span></button>
+              <input id="cdg-layer-file" type="file" accept=".cdg,application/octet-stream" hidden />
+              <button class="stage-tool" id="cdg-view-button" title="Alternar entre letras e karaoke CD+G" hidden><span class="tool-glyph">◉</span><span>Ver karaoke</span></button>
+              <button class="stage-tool active-tool" id="auto-scroll" aria-pressed="true" title="Alternar avanço automático das letras"><span class="tool-glyph">↕</span><span>Auto</span></button>
+              <button class="stage-tool" id="fullscreen-button" title="Ecrã inteiro"><span class="tool-glyph">⛶</span><span>Ecrã</span></button>
+              <button class="stage-tool" id="lyrics-mosaic-button" type="button" title="Abrir mosaico das saídas de letras"><span class="tool-glyph">▦</span><span>Mosaico</span></button>
+            </div></details>
+          </div>
+
+          <div class="now-playing" id="now-playing">
+            <div class="album-tile" id="album-tile"><span>♫</span><i></i></div>
+            <div class="track-info">
+              <span class="eyebrow">A TOCAR AGORA</span>
+              <h2 id="track-title">Escolhe uma música</h2>
+              <p id="track-subtitle">Importa áudio para começar a preparar a setlist</p>
+            </div>
+            <div class="now-playing-right">
+              <span class="format-pill bar-indicator" id="bar-indicator" title="Compasso e batida atuais" hidden>01 · 1</span>
+              <div class="transpose-control" id="transpose-control" data-studio-only title="Transposição do MIDI e dos acordes nas letras; MP3/WAV mantém a afinação">
+                <span class="eyebrow">TOM</span>
+                <button id="transpose-down" aria-label="Descer um semitom">−</button>
+                <span id="transpose-value">0</span>
+                <button id="transpose-up" aria-label="Subir um semitom">+</button>
+              </div>
+              <div class="transpose-control midi-tempo" id="midi-tempo" data-studio-only title="Ajustar o andamento sem alterar a afinação do áudio" hidden>
+                <span class="eyebrow">TEMPO</span>
+                <button id="tempo-down" aria-label="Abranda a faixa">−</button>
+                <span id="tempo-value">100%</span>
+                <button id="tempo-up" aria-label="Acelera a faixa">+</button>
+              </div>
+              <span class="format-pill loop-indicator" id="loop-indicator" hidden>LOOP</span>
+              <span class="format-pill" id="format-pill">SEM FAIXA</span><span id="track-duration">--:--</span>
+            </div>
+          </div>
+
+          <div class="lyrics-stage" id="lyrics-stage">
+            <div class="lyrics-watermark">STAGESET <span>LIVE LYRICS</span></div>
+            <div class="lyrics-content" id="lyrics-content">
+              <span class="lyric-hint">AS LETRAS APARECEM AQUI</span>
+              <p class="lyric-placeholder">Carrega numa música<br />e prepara o teu palco.</p>
+            </div>
+            <canvas id="cdg-canvas" width="300" height="216" aria-label="Ecrã de karaoke CD+G" hidden></canvas>
+            <iframe class="document-frame" id="document-frame" title="Documento da música" hidden></iframe>
+            <div class="lyrics-bottom"><span id="lyric-mode">MODO LETRAS · MANUAL</span><span id="lyric-line-counter">—</span></div>
+          </div>
+
+          <div class="transport" id="transport">
+            <div class="transport-progress">
+              <span class="timecode" id="elapsed">0:00</span>
+              <input id="progress" type="range" min="0" max="1000" value="0" aria-label="Posição da música" />
+              <span class="timecode" id="remaining">-0:00</span>
+            </div>
+            <div class="transport-row">
+              <div class="transport-left">
+                <button class="transport-icon" id="previous" aria-label="Música anterior" title="Anterior">|◀</button>
+                <button class="transport-icon skip-button" id="backward" aria-label="Voltar 10 segundos" title="Voltar 10 segundos">↶<small>10</small></button>
+              </div>
+              <div class="transport-main">
+                <button class="transport-icon loop-toggle" id="loop-toggle" aria-label="Ativar loop" title="Ativar ou desativar o loop" aria-pressed="false" disabled>↻</button>
+                <button class="play-button" id="play" aria-label="Reproduzir" title="Reproduzir / pausar"><span id="play-glyph">▶</span></button>
+              </div>
+              <div class="transport-right">
+                <button class="transport-icon loop-mark" id="loop-in" data-studio-only aria-label="Marcar início do loop" title="Marcar início do loop" disabled>A</button>
+                <button class="transport-icon loop-mark" id="loop-out" data-studio-only aria-label="Marcar fim do loop" title="Marcar fim do loop" disabled>B</button>
+                <button class="transport-icon skip-button" id="forward" aria-label="Avançar 10 segundos" title="Avançar 10 segundos">↷<small>10</small></button>
+                <button class="transport-icon" id="next" aria-label="Próxima música" title="Próxima">▶|</button>
+                <span class="transport-separator"></span>
+                <span class="volume-icon">◖</span>
+                <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume" />
+              </div>
+            </div>
+          </div>
+          <audio id="audio" preload="metadata"></audio>
+        </section>
+        <button class="workspace-resizer" type="button" aria-label="Redimensionar largura da biblioteca" title="Arrasta para alterar a largura da biblioteca"></button>
+        <button class="workspace-resize-corner" type="button" aria-label="Redimensionar o espaço de trabalho" title="Arrasta para redimensionar horizontal e verticalmente"></button>
+      </main>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="modal-backdrop" id="help-modal" hidden>
+        <section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+          <button class="modal-close" id="close-help" aria-label="Fechar">×</button>
+          <span class="eyebrow">CONTROLO DE PALCO</span>
+          <h2 id="help-title">Atalhos de teclado</h2>
+          <div class="shortcut-row"><span>Reproduzir / pausar</span><kbd>Espaço</kbd></div>
+          <div class="shortcut-row"><span>Parar e regressar ao início da faixa</span><kbd>Esc</kbd></div>
+          <div class="shortcut-row"><span>Anterior / seguinte</span><kbd>← / →</kbd></div>
+          <div class="shortcut-row"><span>Recuar / avançar 10 segundos</span><kbd>Shift + ← / →</kbd></div>
+          <div class="shortcut-row"><span>Descer / subir o tom</span><kbd>F9 / F10</kbd></div>
+          <div class="shortcut-row"><span>Abrandar / acelerar</span><kbd>F11 / F12</kbd></div>
+          <div class="shortcut-row"><span>Marcar começo/fim do loop</span><kbd>[ / ]</kbd></div>
+          <div class="shortcut-row"><span>Alternar loop / sair do loop</span><kbd>L / Shift</kbd></div>
+          <div class="shortcut-row"><span>Avançar / recuar letras sem sincronização</span><kbd>↑ / ↓</kbd></div>
+          <div class="shortcut-row"><span>Editar a frase atual das letras</span><kbd>Ctrl + E</kbd></div>
+          <div class="shortcut-row"><span>Substituir palavra selecionada na frase</span><kbd>Ctrl + Shift + E</kbd></div>
+          <div class="shortcut-row"><span>Pesquisar biblioteca</span><kbd>/</kbd></div>
+          <div class="shortcut-row"><span>Abrir esta ajuda</span><kbd>F1</kbd></div>
+          <div class="shortcut-row"><span>Compasso anterior / seguinte</span><kbd>F7 / F8</kbd></div>
+          <div class="shortcut-row"><span>Definir música rápida para a tecla</span><kbd>Ctrl + 1–9</kbd></div>
+          <div class="shortcut-row"><span>Reproduzir música rápida</span><kbd>1–9</kbd></div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="song-editor-modal" hidden>
+        <section class="help-modal song-editor-modal" role="dialog" aria-modal="true" aria-labelledby="song-editor-title">
+          <button class="modal-close" id="close-song-editor" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">BIBLIOTECA</span>
+          <h2 id="song-editor-title">Editar faixa</h2>
+          <form id="song-editor-form">
+            <label class="song-editor-field">Nome
+              <input id="song-title-input" name="title" type="text" maxlength="160" required autocomplete="off" />
+            </label>
+            <label class="song-editor-field">Artista
+              <input id="song-artist-input" name="artist" type="text" maxlength="160" autocomplete="off" />
+            </label>
+            <label class="song-editor-field">Palavras-chave
+              <input id="song-tags-input" name="tags" type="text" maxlength="240" placeholder="Ex.: acústico, entrada, encore" autocomplete="off" />
+            </label>
+            <label class="favorite-editor-field"><input id="song-favorite-input" type="checkbox" /> Marcar como favorita</label>
+            <div class="song-editor-actions">
+              <button class="editor-cancel" id="cancel-song-editor" type="button">Cancelar</button>
+              <button class="connect-button" type="submit">Guardar</button>
+            </div>
+          </form>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="lyrics-editor-modal" hidden>
+        <section class="help-modal lyrics-editor-modal" role="dialog" aria-modal="true" aria-labelledby="lyrics-editor-title">
+          <button class="modal-close" id="close-lyrics-editor" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">LETRAS DA MÚSICA</span>
+          <h2 id="lyrics-editor-title">Editar letras</h2>
+          <form id="lyrics-editor-form">
+            <div class="lyrics-timestamp-tools">
+              <label class="lyrics-editor-output-label" id="lyrics-editor-output-label" for="lyrics-output-target">Editar saída independente</label>
+              <select id="lyrics-output-target"><option value="main">Palco principal</option></select>
+              <span class="lyrics-output-context" id="lyrics-output-context" aria-live="polite">A editar: Palco principal</span>
+              <button class="backup-button" id="lyrics-create-window-shortcut" type="button">＋ Nova janela</button>
+              <label for="lyrics-timestamp-mode">Carimbar</label>
+              <select id="lyrics-timestamp-mode"><option value="line">Linha</option><option value="word">Palavra</option></select>
+              <button class="backup-button" id="lyrics-rewind-1" type="button" title="Recuar 1 segundo">◀ 1s</button>
+              <button class="backup-button" id="lyrics-play-button" type="button" aria-pressed="false"><span id="lyrics-play-glyph">▶</span> <span id="lyrics-play-label">Reproduzir</span></button>
+              <button class="backup-button" id="lyrics-stop-button" type="button">Stop</button>
+              <button class="backup-button" id="lyrics-forward-1" type="button" title="Avançar 1 segundo">1s ▶</button>
+              <button class="backup-button" id="lyrics-stamp-current" type="button">Inserir tempo atual</button>
+            </div>
+            <div class="lyrics-timestamp-tools lyrics-seek-row"><span class="timecode" id="lyrics-elapsed">0:00</span><input id="lyrics-progress" type="range" min="0" max="1000" value="0" aria-label="Posição da música" /><span class="timecode" id="lyrics-remaining">-0:00</span></div>
+            <div class="lyrics-timestamp-tools lyrics-editor-actions-top">
+              <button class="backup-button" id="lyrics-import-button" type="button">Importar letras…</button>
+              <input id="lyrics-file" type="file" accept=".txt,.lrc,.car,text/plain" hidden />
+              <button class="backup-button" id="lyrics-learn-shortcut" type="button">Aprender atalho</button>
+              <label class="lyrics-color-control" title="Aplica a cor ao texto selecionado">Cor <input id="lyrics-color-picker" type="color" value="#65e2c1" aria-label="Cor do texto selecionado" /></label>
+              <button class="backup-button" id="lyrics-apply-color" type="button">Colorir seleção</button>
+              <span class="lyrics-color-preview" id="lyrics-color-preview" aria-label="Pré-visualização da cor selecionada"></span>
+              <label class="lyrics-window-font">Tamanho <input id="lyrics-output-font-size" type="range" min="16" max="96" step="1" value="42" /><output id="lyrics-output-font-label">42 px</output></label>
+              <label class="lyrics-color-control">Foco <input id="lyrics-output-highlight" type="color" value="#65e2c1" aria-label="Cor de destaque desta saída" /></label>
+              <span class="lyrics-shortcut-status" id="lyrics-shortcut-status">Sem atalho</span>
+            </div>
+            <div class="lyrics-timestamp-tools lyrics-bpm-row"><label for="lyrics-bpm">BPM</label><input id="lyrics-bpm" type="number" min="20" max="300" step="0.1" placeholder="120" /><span>Andamento da exportação MIDI/KAR</span></div>
+            <label class="lyrics-editor-field" for="lyrics-editor-text">Texto das letras</label>
+            <div class="lyrics-editor-surface">
+              <div id="lyrics-editor-preview" class="lyrics-editor-preview" aria-hidden="true"></div>
+              <textarea id="lyrics-editor-text" name="lyrics" rows="18" maxlength="200000" spellcheck="false" wrap="off" aria-label="Texto editável das letras"></textarea>
+            </div>
+            <p class="lyrics-editor-help">O atalho aprendido insere um timestamp no cursor e avança para a próxima linha ou palavra. Os timestamps sincronizam automaticamente o scroll com a faixa. Define o BPM base e exporta como MIDI (.mid) ou MIDI karaoke (.kar); o time track e os tempos das letras usam esse andamento. Gravar MIDI karaoke conserva a faixa MIDI associada; sem MIDI, exporta apenas as letras e os tempos. Também podes colocar comandos MIDI em linhas próprias: [midi: CC7.100@1], [midi@play: PC5@1], [midi@stop: STOP] ou [midi@01:34.50: CC10.64@1]. Liga uma saída MIDI no mixer. Barra de espaço reproduz/pausa fora da caixa de texto; dentro dela continua a escrever espaços.</p>
+            <div class="song-editor-actions">
+              <button class="editor-cancel" id="cancel-lyrics-editor" type="button">Cancelar</button>
+              <button class="backup-button" id="lyrics-export-kar" type="button" title="Grava a letra sincronizada num ficheiro MIDI karaoke .kar.">Gravar MIDI karaoke (.kar)</button>
+              <button class="backup-button" id="lyrics-export-midi" type="button" title="Grava a letra sincronizada num ficheiro MIDI Standard .mid.">Gravar MIDI (.mid)</button>
+              <button class="connect-button" id="lyrics-save-button" type="submit">Guardar letras e tempos</button>
+            </div>
+          </form>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="timeline-editor-modal" hidden>
+        <section class="help-modal timeline-editor-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-editor-title">
+          <button class="modal-close" id="close-timeline-editor" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">EDIÇÃO MULTIPISTA</span>
+          <h2 id="timeline-editor-title">Editor de áudio, MIDI e letras</h2>
+          <div class="timeline-toolbar">
+            <label>BPM <input id="timeline-bpm" type="number" min="20" max="300" step="0.1" value="120" /></label>
+            <label>Evento MIDI
+              <select id="timeline-event-type"><option value="cc">Control Change</option><option value="program">Program Change</option><option value="note">Note</option><option value="song">Song Select</option><option value="pitch">Pitch Bend</option></select>
+            </label>
+            <label id="timeline-event-number-label" hidden>Nota MIDI<input id="timeline-event-number" type="number" min="0" max="127" step="1" value="60" /></label>
+            <label>Controlador
+              <select id="timeline-cc-number"><option value="1">Modulação (CC 1)</option><option value="7">Volume (CC 7)</option><option value="10">Pan (CC 10)</option><option value="11">Expression (CC 11)</option><option value="64">Sustain (CC 64)</option></select>
+            </label>
+            <label>Canal <select id="timeline-midi-channel"></select></label>
+            <label>Valor CC <input id="timeline-cc-value" type="range" min="0" max="127" value="64" /><output id="timeline-cc-value-label">64</output></label>
+            <button class="backup-button" id="timeline-add-cc" type="button">Adicionar ponto CC</button>
+            <div class="timeline-zoom-controls"><button class="backup-button" id="timeline-zoom-out" type="button" aria-label="Reduzir zoom">−</button><span id="timeline-zoom-label">100%</span><button class="backup-button" id="timeline-zoom-in" type="button" aria-label="Aumentar zoom">+</button></div>
+            <div class="timeline-transport"><button class="backup-button" id="timeline-back" type="button" title="Recuar 5 segundos">◀ 5</button><button class="backup-button" id="timeline-stop" type="button">Stop</button><button class="backup-button" id="timeline-play" type="button">▶</button><button class="backup-button" id="timeline-pause" type="button">Ⅱ</button><button class="backup-button" id="timeline-forward" type="button" title="Avançar 5 segundos">5 ▶</button></div>
+            <button class="backup-button" id="timeline-convert-midi" type="button">Exportar Piano Roll MIDI</button>
+            <button class="backup-button" id="timeline-save-lyrics" type="button">Editar / guardar letras</button>
+            <span id="timeline-position">0:00</span>
+          </div>
+          <section class="stem-split-panel" aria-label="Separar áudio em pistas">
+            <div class="stem-split-heading"><div><strong>Separar stems</strong><p>Usa o StemDeck instalado neste computador. O áudio é processado localmente.</p></div><span id="stem-split-connection" role="status">A verificar StemDeck…</span></div>
+            <div class="stem-split-controls">
+              <label><input type="checkbox" name="stem-split-name" value="vocals" checked /> Voz</label>
+              <label><input type="checkbox" name="stem-split-name" value="drums" checked /> Bateria</label>
+              <label><input type="checkbox" name="stem-split-name" value="bass" checked /> Baixo</label>
+              <label><input type="checkbox" name="stem-split-name" value="guitar" checked /> Guitarra</label>
+              <label><input type="checkbox" name="stem-split-name" value="piano" checked /> Piano</label>
+              <label><input type="checkbox" name="stem-split-name" value="other" checked /> Outros</label>
+              <button class="backup-button" id="stem-split-check" type="button">Verificar ligação</button>
+              <button class="backup-button" id="stemdeck-select-app" type="button">Escolher StemDeck…</button>
+              <button class="backup-button" id="stemdeck-launch-app" type="button">Abrir StemDeck local</button>
+              <button class="backup-button primary-button" id="stem-split-run" type="button" disabled>Separar e importar</button>
+              <button class="backup-button" id="stem-import-external" type="button">Importar de outro programa…</button>
+              <input id="stem-external-files" type="file" accept="audio/*,.wav,.mp3,.flac,.m4a,.ogg,.zip" multiple hidden />
+              <button class="backup-button" id="stem-split-cancel" type="button" hidden>Cancelar</button>
+            </div>
+            <p class="stem-split-status" id="stem-split-status" aria-live="polite">Liga o StemDeck para separar esta faixa.</p>
+          </section>
+          <div class="timeline-scroll" id="timeline-scroll"><canvas id="timeline-canvas" width="1200" height="560" aria-label="Piano roll com áudio, MIDI, controladores e letras"></canvas></div>
+          <p class="lyrics-editor-help">A grelha segue o BPM e marca compassos de 8 tempos. Arrasta pontos MIDI e marcadores de letra para os deslocar; clica no marcador para editar o seu valor. Ctrl+Z anula a última alteração.</p>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="midi-mixer-modal" hidden>
+        <section class="help-modal midi-mixer-modal" role="dialog" aria-modal="true" aria-labelledby="midi-mixer-title">
+          <button class="modal-close" id="close-midi-mixer" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">MISTURA DA FAIXA</span>
+          <h2 id="midi-mixer-title">Mixer MIDI</h2>
+          <button class="backup-button midi-refresh-outputs" id="midi-refresh-outputs" type="button">Procurar portas MIDI</button>
+          <p class="midi-mixer-description">Controla volume, panorâmica, Solo e timbres sintetizados por canal. As alterações de timbre também se aplicam durante a reprodução.</p>
+          <p class="midi-mixer-description">Os 16 canais MIDI têm encaminhamento independente. Liga primeiro as interfaces no menu Pedais; depois escolhe uma porta em cada canal.</p>
+          <div class="midi-mixer-list" id="midi-mixer-list"></div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="audio-mixer-modal" hidden>
+        <section class="help-modal audio-mixer-modal" role="dialog" aria-modal="true" aria-labelledby="audio-mixer-title">
+          <button class="modal-close" id="close-audio-mixer" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">MISTURA DA FAIXA</span>
+          <h2 id="audio-mixer-title">Mixer de áudio</h2>
+          <p class="midi-mixer-description" id="audio-mixer-description">Controla volume, panorâmica, Solo e silêncio por canal.</p>
+          <div class="audio-output-settings"><button id="choose-audio-output" type="button">Procurar interfaces</button><label for="audio-output-device">Dispositivo</label><select id="audio-output-device" aria-label="Interface áudio"><option value="default">Saída padrão</option></select><span id="audio-output-status">Saída do sistema · 1/2</span></div>
+          <div class="audio-mixer-list" id="audio-mixer-list"></div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="report-modal" hidden>
+        <section class="help-modal report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title">
+          <button class="modal-close" id="close-report" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">LISTAS DA COLEÇÃO</span>
+          <h2 id="report-title">Relatórios</h2>
+          <p class="midi-mixer-description">Escolhe o conteúdo do relatório. O ficheiro HTML abre sem ligação à Internet e inclui uma opção para imprimir.</p>
+          <div class="report-actions">
+            <button class="report-action" id="report-setlist" type="button"><strong>Setlist</strong><span>As músicas preparadas para a atuação atual.</span></button>
+            <button class="report-action" id="report-library" type="button"><strong>Biblioteca inteira</strong><span>Todos os itens guardados neste dispositivo.</span></button>
+          </div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="pedal-modal" hidden>
+        <section class="help-modal pedal-modal" role="dialog" aria-modal="true" aria-labelledby="pedal-title">
+          <button class="modal-close" id="close-pedals" aria-label="Fechar">×</button>
+          <span class="eyebrow">CONTROLO MÃOS-LIVRES</span>
+          <h2 id="pedal-title">Configurar pedais MIDI</h2>
+          <p class="pedal-description">Liga um pedal MIDI e aprende até quatro botões. Podes avançar letras manualmente ou configurar um pedal para iniciar a música e depois avançar linha a linha.</p>
+          <div class="pedal-connect-row">
+            <button class="connect-button" id="connect-pedal">Ligar pedal</button>
+            <select id="pedal-device" aria-label="Dispositivo MIDI" disabled><option value="">Nenhum dispositivo ligado</option></select>
+            <span class="pedal-status" id="pedal-status">Desligado</span>
+          </div>
+          <section class="setlist-cc-config" aria-labelledby="setlist-cc-title">
+            <label class="setlist-cc-enable" id="setlist-cc-title" for="setlist-cc-enabled"><input id="setlist-cc-enabled" type="checkbox" /> Selecionar música da setlist por MIDI</label>
+            <div class="setlist-cc-fields">
+              <label for="setlist-midi-type">Tipo de mensagem
+                <select id="setlist-midi-type"><option value="cc">Control Change</option><option value="program">Program Change</option><option value="note">MIDI Note</option><option value="song">Song Select</option></select>
+              </label>
+              <label for="setlist-cc-channel">Canal MIDI
+                <select id="setlist-cc-channel"></select>
+              </label>
+              <label id="setlist-cc-number-label" for="setlist-cc-number">Control Change (CC)
+                <input id="setlist-cc-number" type="number" min="0" max="127" step="1" value="20" />
+              </label>
+            </div>
+            <div class="setlist-midi-learning"><button class="backup-button" id="setlist-midi-learn" type="button">Aprender mensagem MIDI</button><span id="setlist-midi-learn-status">Ainda não aprendido</span></div>
+            <p id="setlist-midi-type-hint" hidden></p>
+            <p id="setlist-cc-status">Escolhe o tipo de mensagem e atribui um valor diferente a cada música. Ao receber a mensagem, a faixa fica selecionada; a reprodução continua manual.</p>
+          </section>
+          <label class="midi-output-row" for="midi-output-device">
+            <span>Saída para ficheiros MIDI</span>
+            <select id="midi-output-device" aria-label="Saída MIDI externa" disabled><option value="internal">Sintetizador interno</option></select>
+          </label>
+          <p class="midi-output-status" id="midi-output-status">A tocar pelo sintetizador interno. Liga os dispositivos MIDI para ver saídas disponíveis.</p>
+          <div class="pedal-table-head"><span>ENTRADA</span><span>SINAL</span><span>AÇÃO</span></div>
+          <div class="pedal-map" id="pedal-map"></div>
+          <div class="pedal-footnote">Compatibilidade MIDI depende do browser e dos dispositivos disponíveis. Ao escolher uma saída externa, esta recebe as notas e pode substituir o sintetizador interno. O mapeamento do pedal fica guardado neste dispositivo.</div>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="settings-modal" hidden>
+        <section class="help-modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <button class="modal-close" id="close-settings" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">DISPOSITIVOS E ECRÃS</span><h2 id="settings-title">Configurações</h2>
+          <section class="settings-group"><h3>Áudio, vídeo e MIDI</h3><p>Ao iniciar, o StageSet pede autorização para detetar interfaces de entrada. Os streams temporários são fechados logo após a deteção. As saídas áudio são configuradas no Mixer áudio e as portas MIDI no menu Pedais.</p><p id="device-access-status" role="status">A detetar interfaces…</p><label class="settings-field">Entrada áudio<select id="audio-input-device"><option value="">Nenhuma entrada listada</option></select></label><label class="settings-field">Câmara / entrada vídeo<select id="video-input-device"><option value="">Nenhuma entrada listada</option></select></label><div class="settings-actions"><button class="backup-button" id="refresh-audio-inputs" type="button">Pedir autorização e procurar</button><button class="backup-button" id="settings-audio" type="button">Configurar saídas áudio</button><button class="backup-button" id="settings-midi" type="button">Configurar portas MIDI</button></div></section>
+          <section class="settings-group"><h3>Saída de letras</h3><label class="settings-field">Cor de destaque da frase atual <input id="settings-lyric-highlight" type="color" value="#65e2c1" /></label><div id="display-output-list" class="display-output-list"></div><div class="display-output-create"><label>Nome da nova janela <input id="new-display-output-name" maxlength="40" placeholder="Ex.: Vocalista" /></label><label>Cor <input id="new-display-output-color" type="color" value="#65e2c1" /></label><button class="backup-button" id="create-display-output" type="button">＋ Criar janela</button></div><button class="connect-button" id="open-display-windows" type="button">Abrir janelas de letras</button><button class="backup-button" id="open-lyrics-mosaic-settings" type="button">Abrir mosaico de janelas</button></section>
+          <section class="settings-group"><h3>Separação de stems</h3><label class="settings-field">Fonte local<select id="stem-provider"><option value="stemdeck">StemDeck · serviço local</option><option value="zip">Importar ZIP de qualquer separador</option></select></label><p>O StemDeck processa no computador. A opção ZIP aceita stems criados noutra aplicação.</p></section>
+          <section class="settings-group"><h3>Palavra-passe do Studio</h3><label class="settings-field">Palavra-passe atual <input id="studio-password-current" type="password" autocomplete="current-password" /></label><label class="settings-field">Nova palavra-passe <input id="studio-password-new" type="password" minlength="6" autocomplete="new-password" /></label><label class="settings-field">Confirmar nova palavra-passe <input id="studio-password-new-confirm" type="password" minlength="6" autocomplete="new-password" /></label><button class="backup-button" id="save-studio-password" type="button">Guardar palavra-passe</button></section>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="studio-password-modal" hidden>
+        <section class="help-modal studio-password-modal" role="dialog" aria-modal="true" aria-labelledby="studio-password-title">
+          <button class="modal-close" id="close-studio-password" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">ACESSO DE PROGRAMAÇÃO</span>
+          <h2 id="studio-password-title">Entrar no Studio</h2>
+          <form id="studio-password-form">
+            <label class="lyrics-editor-field" for="studio-password-input">Palavra-passe
+              <input id="studio-password-input" type="password" minlength="6" autocomplete="current-password" required />
+            </label>
+            <label class="lyrics-editor-field" id="studio-password-confirm-field" for="studio-password-confirm" hidden>Confirmar palavra-passe
+              <input id="studio-password-confirm" type="password" minlength="6" autocomplete="new-password" />
+            </label>
+            <p class="lyrics-editor-help" id="studio-password-help">O modo Live abre sempre primeiro. O Studio permite alterar e programar o espetáculo.</p>
+            <div class="song-editor-actions"><button class="editor-cancel" id="cancel-studio-password" type="button">Cancelar</button><button class="connect-button" type="submit" id="studio-password-submit">Entrar no Studio</button></div>
+          </form>
+        </section>
+      </div>
+      <div class="modal-backdrop" id="song-cc-modal" hidden>
+        <section class="help-modal song-cc-modal" role="dialog" aria-modal="true" aria-labelledby="song-cc-title">
+          <button class="modal-close" id="close-song-cc" type="button" aria-label="Fechar">×</button>
+          <span class="eyebrow">SELEÇÃO MIDI DA SETLIST</span>
+          <h2 id="song-cc-title">Atribuir mensagem MIDI</h2>
+          <form id="song-cc-form">
+            <label for="song-cc-type">Tipo de evento MIDI
+              <select id="song-cc-type"><option value="cc">Control Change</option><option value="program">Program Change</option><option value="note">MIDI Note</option><option value="song">Song Select</option></select>
+            </label>
+            <label>Canal MIDI<select id="song-cc-channel"></select></label>
+            <label id="song-cc-number-label">Control Change<input id="song-cc-number" type="number" min="0" max="127" step="1" required /></label>
+            <label id="song-cc-value-label">Valor para esta música<input id="song-cc-value" type="number" min="0" max="127" step="1" required /></label>
+            <div class="setlist-midi-learning"><button class="backup-button" id="song-cc-learn" type="button">Learn MIDI</button><span id="song-cc-learn-status" aria-live="polite">Introduz os valores ou aprende uma mensagem MIDI.</span></div>
+            <div class="song-editor-actions"><button class="editor-cancel" id="cancel-song-cc" type="button">Cancelar</button><button class="connect-button" type="submit">Guardar atribuição</button></div>
+          </form>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

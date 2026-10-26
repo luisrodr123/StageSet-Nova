@@ -1,0 +1,49 @@
+{
+  "name": "stage-set",
+  "version": "0.6.0",
+  "description": "Windows setlist, lyrics and karaoke player",
+  "private": true,
+  "type": "module",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "dist:win:portable": "electron-builder --win portable",
+    "dist:win:all": "electron-builder --win nsis portable",
+    "dist:win:zip": "electron-builder --win zip"
+  },
+  "devDependencies": {
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "pt.stageset.desktop",
+    "productName": "StageSet",
+    "npmRebuild": false,
+    "electronLanguages": ["en-US", "pt-PT"],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "signExecutable": false,
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "StageSet-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "StageSet-${version}-Portable-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "StageSet-${version}-Setup-${arch}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
