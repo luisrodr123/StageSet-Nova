@@ -36,7 +36,7 @@
           <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <span class="app-version" aria-label="Versão da aplicação">v0.6</span>
+          <span class="app-version" aria-label="Versão da aplicação">v0.9</span>
         </div>
       </header>
 
@@ -50,10 +50,12 @@
             <div class="setlist-items" id="setlist-items"></div>
             <div class="setlist-empty" id="setlist-empty">Adiciona músicas da biblioteca para montar a setlist.</div>
             <div class="setlist-preferences" data-studio-only>
-              <label class="queue-hide-option"><input id="hide-setlist-during-playback" type="checkbox" /> Ocultar ao tocar</label>
+              <button class="subtle-button" id="queue-save" type="button">Guardar</button><button class="subtle-button" id="queue-load" type="button">Carregar</button>
+              <label class="queue-hide-option"><input id="hide-setlist-during-playback" type="checkbox" /> Ocultar tocadas</label>
               <label class="queue-delay-option" for="inter-song-delay" title="0 segundos significa reprodução contínua">Intervalo
                 <input id="inter-song-delay" type="number" min="0" max="3600" step="1" inputmode="numeric" aria-label="Segundos entre músicas" /> s
               </label>
+              <label>Ao terminar <select id="queue-end-action"><option value="next">Next</option><option value="stop">Stop</option></select></label>
             </div>
           </section>
           <section class="panel library-panel">
@@ -63,6 +65,7 @@
                 <h1>Biblioteca</h1>
               </div>
               <div class="library-import-actions" data-studio-only>
+                <button class="backup-button" id="create-song" type="button">Nova música</button><input id="new-song-files" type="file" accept="audio/*,.mid,.midi,.kar,.zip" multiple hidden />
                 <button class="round-add folder-add" id="add-folder" type="button" aria-label="Importar uma pasta" title="Importar uma pasta de música"><span class="folder-icon" aria-hidden="true"></span></button>
                 <button class="round-add" id="add-audio" type="button" aria-label="Importar faixas ou documentos" title="Importar áudio, MIDI, CD+G, PDF, RTF, TXT ou ZIP">+</button>
                 <input id="audio-files" type="file" accept="audio/*,.mogg,.mid,.midi,.kar,.cdg,.pdf,.rtf,.txt,.zip,application/zip" multiple hidden />
@@ -235,6 +238,7 @@
           </form>
         </section>
       </div>
+      <div class="modal-backdrop" id="new-song-modal" hidden><section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="new-song-title"><h2 id="new-song-title">Nova música</h2><label class="lyrics-editor-field">Nome <input id="new-song-name" maxlength="100" /></label><p>Seleciona áudio, stems e até um ficheiro MIDI/KAR, ou cria uma música vazia.</p><div class="song-editor-actions"><button class="backup-button" id="cancel-new-song" type="button">Cancelar</button><button class="backup-button" id="new-song-empty" type="button">Criar vazia</button><button class="connect-button" id="new-song-import" type="button">Escolher ficheiros</button></div></section></div>
       <div class="modal-backdrop" id="lyrics-editor-modal" hidden>
         <section class="help-modal lyrics-editor-modal" role="dialog" aria-modal="true" aria-labelledby="lyrics-editor-title">
           <button class="modal-close" id="close-lyrics-editor" type="button" aria-label="Fechar">×</button>
@@ -266,7 +270,7 @@
               <label class="lyrics-color-control">Foco <input id="lyrics-output-highlight" type="color" value="#65e2c1" aria-label="Cor de destaque desta saída" /></label>
               <span class="lyrics-shortcut-status" id="lyrics-shortcut-status">Sem atalho</span>
             </div>
-            <div class="lyrics-timestamp-tools lyrics-bpm-row"><label for="lyrics-bpm">BPM</label><input id="lyrics-bpm" type="number" min="20" max="300" step="0.1" placeholder="120" /><span>Andamento da exportação MIDI/KAR</span></div>
+            <div class="lyrics-timestamp-tools lyrics-bpm-row"><label for="lyrics-bpm">BPM</label><input id="lyrics-bpm" type="number" min="20" max="300" step="0.1" placeholder="120" /><span>Andamento da exportação MIDI/KAR</span><button class="backup-button" id="lyrics-import-tempo" type="button">Importar BPM MIDI/KAR</button><input id="lyrics-tempo-file" type="file" accept=".mid,.midi,.kar" hidden /></div>
             <label class="lyrics-editor-field" for="lyrics-editor-text">Texto das letras</label>
             <div class="lyrics-editor-surface">
               <div id="lyrics-editor-preview" class="lyrics-editor-preview" aria-hidden="true"></div>
@@ -277,6 +281,7 @@
               <button class="editor-cancel" id="cancel-lyrics-editor" type="button">Cancelar</button>
               <button class="backup-button" id="lyrics-export-kar" type="button" title="Grava a letra sincronizada num ficheiro MIDI karaoke .kar.">Gravar MIDI karaoke (.kar)</button>
               <button class="backup-button" id="lyrics-export-midi" type="button" title="Grava a letra sincronizada num ficheiro MIDI Standard .mid.">Gravar MIDI (.mid)</button>
+              <button class="backup-button" id="lyrics-export-text" type="button">Gravar texto (.txt)</button>
               <button class="connect-button" id="lyrics-save-button" type="submit">Guardar letras e tempos</button>
             </div>
           </form>
@@ -366,7 +371,7 @@
           <button class="modal-close" id="close-pedals" aria-label="Fechar">×</button>
           <span class="eyebrow">CONTROLO MÃOS-LIVRES</span>
           <h2 id="pedal-title">Configurar pedais MIDI</h2>
-          <p class="pedal-description">Liga um pedal MIDI e aprende até quatro botões. Podes avançar letras manualmente ou configurar um pedal para iniciar a música e depois avançar linha a linha.</p>
+          <p class="pedal-description">Liga um pedal MIDI e adiciona os controlos que precisares. Podes avançar letras manualmente ou configurar um pedal para iniciar a música e depois avançar linha a linha.</p>
           <div class="pedal-connect-row">
             <button class="connect-button" id="connect-pedal">Ligar pedal</button>
             <select id="pedal-device" aria-label="Dispositivo MIDI" disabled><option value="">Nenhum dispositivo ligado</option></select>
@@ -385,6 +390,7 @@
                 <input id="setlist-cc-number" type="number" min="0" max="127" step="1" value="20" />
               </label>
             </div>
+            <div class="setlist-cc-fields"><label>Música<select id="midi-assign-song"></select></label><label><span id="midi-assign-value-label">Valor da mensagem</span><input id="midi-assign-value" type="number" min="0" max="127" step="1" placeholder="—" /></label><button id="midi-assign-save" class="backup-button" type="button">Guardar atribuição</button></div>
             <div class="setlist-midi-learning"><button class="backup-button" id="setlist-midi-learn" type="button">Aprender mensagem MIDI</button><span id="setlist-midi-learn-status">Ainda não aprendido</span></div>
             <p id="setlist-midi-type-hint" hidden></p>
             <p id="setlist-cc-status">Escolhe o tipo de mensagem e atribui um valor diferente a cada música. Ao receber a mensagem, a faixa fica selecionada; a reprodução continua manual.</p>
@@ -396,6 +402,7 @@
           <p class="midi-output-status" id="midi-output-status">A tocar pelo sintetizador interno. Liga os dispositivos MIDI para ver saídas disponíveis.</p>
           <div class="pedal-table-head"><span>ENTRADA</span><span>SINAL</span><span>AÇÃO</span></div>
           <div class="pedal-map" id="pedal-map"></div>
+          <button class="backup-button" id="add-pedal" type="button">＋ Adicionar pedal</button>
           <div class="pedal-footnote">Compatibilidade MIDI depende do browser e dos dispositivos disponíveis. Ao escolher uma saída externa, esta recebe as notas e pode substituir o sintetizador interno. O mapeamento do pedal fica guardado neste dispositivo.</div>
         </section>
       </div>
@@ -403,8 +410,30 @@
         <section class="help-modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <button class="modal-close" id="close-settings" type="button" aria-label="Fechar">×</button>
           <span class="eyebrow">DISPOSITIVOS E ECRÃS</span><h2 id="settings-title">Configurações</h2>
+          <section class="settings-group"><h3>MIDI por rede · 10 portas × 16 canais</h3>
+            <p>IP MIDI multicast na aplicação desktop. As portas ficam disponíveis nos menus de entrada, saída e mixer. Outros programas Windows precisam de um driver IP MIDI próprio para aceder à rede.</p>
+            <label class="settings-field">Grupo multicast<input id="ip-midi-group" value="225.0.0.37" /></label>
+            <label class="settings-field">Primeira porta UDP<input id="ip-midi-port" type="number" min="1024" max="65526" value="21928" /></label>
+            <label class="settings-field">IP da interface local (opcional)<input id="ip-midi-interface" placeholder="Automática" /></label>
+            <button class="backup-button" id="ip-midi-start" type="button">Ligar 10 portas</button> <button class="backup-button" id="ip-midi-stop" type="button" disabled>Desligar portas</button>
+            <p id="ip-midi-status" role="status">Desligado</p><ul id="ip-midi-list"></ul>
+          </section>
+          <section class="settings-group"><h3>Sincronização SMPTE / MTC</h3>
+            <fieldset id="sync-options"><label class="settings-field">Modo<select id="sync-mode"><option value="mtc-write">Emitir MTC</option><option value="mtc-read">Ler MTC</option><option value="ltc-write">Emitir SMPTE / LTC áudio</option><option value="ltc-read">Ler SMPTE / LTC áudio</option></select></label>
+            <label class="settings-field">Fotogramas por segundo<select id="sync-rate"><option value="0">24 fps</option><option value="1" selected>25 fps</option><option value="2">29,97 drop-frame</option><option value="3">30 fps</option></select></label>
+            <label class="settings-field">Desvio do timecode (segundos)<input id="sync-offset" type="number" value="0" min="0" max="86400" step="0.01" /></label>
+            <label class="settings-field" data-sync-mode="mtc-read">Entrada MIDI<select id="sync-midi-in"></select></label>
+            <label class="settings-field" data-sync-mode="mtc-write">Saída MIDI<select id="sync-midi-out"></select></label>
+            <label class="settings-field" data-sync-mode="ltc-read">Entrada LTC<select id="sync-audio-in"></select></label>
+            <label class="settings-field" data-sync-mode="ltc-write">Saída LTC<select id="sync-audio-out"></select></label>
+            <label data-sync-mode="mtc-read ltc-read"><input id="sync-follow" type="checkbox" /> Seguir sinal com a música atual (parar se o sinal desaparecer)</label>
+            <p data-sync-mode="ltc-write">Liga a saída escolhida à entrada de timecode do equipamento. O sinal LTC é um sinal áudio de sincronização.</p>
+            <button class="backup-button" id="sync-refresh" type="button">Atualizar portas / autorizar MIDI e SysEx</button></fieldset>
+            <button class="connect-button" id="sync-start" type="button">Iniciar sincronização</button> <button class="backup-button" id="sync-stop" type="button" disabled>Parar sincronização</button>
+            <p id="sync-status" role="status">Desligado</p>
+          </section>
           <section class="settings-group"><h3>Áudio, vídeo e MIDI</h3><p>Ao iniciar, o StageSet pede autorização para detetar interfaces de entrada. Os streams temporários são fechados logo após a deteção. As saídas áudio são configuradas no Mixer áudio e as portas MIDI no menu Pedais.</p><p id="device-access-status" role="status">A detetar interfaces…</p><label class="settings-field">Entrada áudio<select id="audio-input-device"><option value="">Nenhuma entrada listada</option></select></label><label class="settings-field">Câmara / entrada vídeo<select id="video-input-device"><option value="">Nenhuma entrada listada</option></select></label><div class="settings-actions"><button class="backup-button" id="refresh-audio-inputs" type="button">Pedir autorização e procurar</button><button class="backup-button" id="settings-audio" type="button">Configurar saídas áudio</button><button class="backup-button" id="settings-midi" type="button">Configurar portas MIDI</button></div></section>
-          <section class="settings-group"><h3>Saída de letras</h3><label class="settings-field">Cor de destaque da frase atual <input id="settings-lyric-highlight" type="color" value="#65e2c1" /></label><div id="display-output-list" class="display-output-list"></div><div class="display-output-create"><label>Nome da nova janela <input id="new-display-output-name" maxlength="40" placeholder="Ex.: Vocalista" /></label><label>Cor <input id="new-display-output-color" type="color" value="#65e2c1" /></label><button class="backup-button" id="create-display-output" type="button">＋ Criar janela</button></div><button class="connect-button" id="open-display-windows" type="button">Abrir janelas de letras</button><button class="backup-button" id="open-lyrics-mosaic-settings" type="button">Abrir mosaico de janelas</button></section>
+          <section class="settings-group"><h3>Saída de letras</h3><label class="settings-field">Ecrã principal <select id="main-display-select"><option value="">Ecrã atual</option></select></label><label class="settings-field">Ecrã do mosaico <select id="mosaic-display-select"><option value="">Ecrã atual</option></select></label><p id="display-selection-status"></p><label class="settings-field">Cor de destaque da frase atual <input id="settings-lyric-highlight" type="color" value="#65e2c1" /></label><div id="display-output-list" class="display-output-list"></div><div class="display-output-create"><label>Nome da nova janela <input id="new-display-output-name" maxlength="40" placeholder="Ex.: Vocalista" /></label><label>Cor <input id="new-display-output-color" type="color" value="#65e2c1" /></label><button class="backup-button" id="create-display-output" type="button">＋ Criar janela</button></div><button class="connect-button" id="open-display-windows" type="button">Abrir janelas de letras</button><button class="backup-button" id="open-lyrics-mosaic-settings" type="button">Abrir mosaico de janelas</button></section>
           <section class="settings-group"><h3>Separação de stems</h3><label class="settings-field">Fonte local<select id="stem-provider"><option value="stemdeck">StemDeck · serviço local</option><option value="zip">Importar ZIP de qualquer separador</option></select></label><p>O StemDeck processa no computador. A opção ZIP aceita stems criados noutra aplicação.</p></section>
           <section class="settings-group"><h3>Palavra-passe do Studio</h3><label class="settings-field">Palavra-passe atual <input id="studio-password-current" type="password" autocomplete="current-password" /></label><label class="settings-field">Nova palavra-passe <input id="studio-password-new" type="password" minlength="6" autocomplete="new-password" /></label><label class="settings-field">Confirmar nova palavra-passe <input id="studio-password-new-confirm" type="password" minlength="6" autocomplete="new-password" /></label><button class="backup-button" id="save-studio-password" type="button">Guardar palavra-passe</button></section>
         </section>
@@ -444,6 +473,7 @@
         </section>
       </div>
     </div>
+    <div id="learn-modal" class="modal-backdrop" hidden><section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="learn-title"><h2 id="learn-title">Aprender atalho</h2><p id="learn-button-name"></p><p>Podes associar um atalho de teclado e um MIDI ao mesmo botão.</p><div class="song-editor-actions"><button id="learn-key" type="button">Teclado</button><button id="learn-midi" type="button">MIDI</button><button id="learn-clear" type="button">Remover atalhos</button><button id="learn-cancel" type="button">Cancelar</button></div></section></div>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

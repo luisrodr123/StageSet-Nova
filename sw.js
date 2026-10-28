@@ -1,9 +1,15 @@
-const CACHE_NAME = "stageset-shell-v10";
+const CACHE_NAME = "stageset-shell-v14";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./timecode.js",
+  "./ltc-worklet.js",
+  "./sync.js",
+  "./network-midi.js",
+  "./mosaic.html",
+  "./mosaic.js",
   "./midi.js",
   "./cdg.js",
   "./documents.js",

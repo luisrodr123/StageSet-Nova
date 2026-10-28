@@ -56,6 +56,7 @@ export function createBackup(songs, preferences) {
       quickies: preferences.quickies,
       hideSetlistDuringPlayback: preferences.hideSetlistDuringPlayback,
       interSongDelay: preferences.interSongDelay,
+      interfaceSettings: preferences.interfaceSettings,
     },
   };
   const headerBytes = new TextEncoder().encode(JSON.stringify(manifest));
@@ -171,12 +172,13 @@ export async function readBackup(file) {
     volume: Number.isFinite(preferences.volume) ? Math.max(0, Math.min(1, preferences.volume)) : 0.8,
     setlistCcConfig: {
       enabled: typeof setlistCcConfig.enabled === "boolean" ? setlistCcConfig.enabled : false,
-      type: setlistCcConfig.type === "program" ? "program" : "cc",
+      type: ["cc","program","note","song"].includes(setlistCcConfig.type) ? setlistCcConfig.type : "cc",
       channel: Number.isInteger(setlistCcConfig.channel) ? Math.max(0, Math.min(15, setlistCcConfig.channel)) : 0,
       number: Number.isInteger(setlistCcConfig.number) ? Math.max(0, Math.min(127, setlistCcConfig.number)) : 20,
     },
-    pedalMappings: Array.isArray(preferences.pedalMappings) && preferences.pedalMappings.length === 4
+    pedalMappings: Array.isArray(preferences.pedalMappings) && preferences.pedalMappings.length > 0
       ? preferences.pedalMappings
       : null,
+    interfaceSettings: preferences.interfaceSettings && typeof preferences.interfaceSettings === 'object' ? preferences.interfaceSettings : {},
   };
 }

@@ -1,6 +1,6 @@
 {
   "name": "stage-set",
-  "version": "0.6.0",
+  "version": "0.9.0",
   "description": "Windows setlist, lyrics and karaoke player",
   "private": true,
   "type": "module",
@@ -10,8 +10,12 @@
     "desktop": "electron .",
     "dist:win": "electron-builder --win nsis",
     "dist:win:portable": "electron-builder --win portable",
-    "dist:win:all": "electron-builder --win nsis portable",
-    "dist:win:zip": "electron-builder --win zip"
+    "dist:win:all": "electron-builder --win nsis portable --x64",
+    "dist:win:zip": "electron-builder --win zip",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "test:smoke": "electron tests/smoke.cjs",
+    "bump": "node scripts/version.mjs"
   },
   "devDependencies": {
     "electron": "^44.7.2",
@@ -21,17 +25,22 @@
     "appId": "pt.stageset.desktop",
     "productName": "StageSet",
     "npmRebuild": false,
-    "electronLanguages": ["en-US", "pt-PT"],
+    "electronLanguages": [
+      "en-US",
+      "pt-PT"
+    ],
     "directories": {
       "output": "dist"
     },
     "win": {
       "signExecutable": false,
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "StageSet-${version}-${arch}.${ext}"
@@ -44,6 +53,21 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "files": [
+      "*.js",
+      "*.html",
+      "*.css",
+      "*.svg",
+      "*.webmanifest",
+      "server.mjs",
+      "desktop/**",
+      "package.json",
+      "STAGESET-ALTERACOES.md",
+      "README.md"
+    ]
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

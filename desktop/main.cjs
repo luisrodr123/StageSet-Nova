@@ -1,8 +1,10 @@
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const { app, BrowserWindow, dialog, session, ipcMain } = require("electron");
+const { app, BrowserWindow, dialog, session, ipcMain, screen } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
+const { IpMidi } = require('./ip-midi.cjs');
+const ipMidi = new IpMidi();
 
 const desktopPort = 4178;
 const localUrl = `http://127.0.0.1:${desktopPort}`;
@@ -10,11 +12,34 @@ const hasSingleInstance = app.requestSingleInstanceLock();
 let server;
 let mainWindow;
 let stemDeckProcess;
+const displayAssignments = new Map();
+const displayWindows = new Map();
 const stemDeckConfigPath = () => path.join(app.getPath("userData"), "stemdeck-path.json");
 
 if (!hasSingleInstance) {
   app.quit();
 } else {
+  const trusted = event => event.sender === mainWindow?.webContents && new URL(event.sender.getURL()).origin === localUrl;
+  for (const [name, handler] of Object.entries({start: config => ipMidi.start(config), stop: () => ipMidi.stop(), send: (id,data,delay) => ipMidi.send(id,data,delay), clear: id => ipMidi.clear(id)})) {
+    ipcMain.handle(`ipmidi:${name}`, (event,...args) => { if(!trusted(event))throw new Error('Janela não autorizada.');return handler(...args); });
+  }
+  ipMidi.on('message', message => { if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send('ipmidi:message',message); });
+  ipMidi.on('status', status => { if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send('ipmidi:status',status); });
+  ipcMain.handle("displays:list", (event) => {
+    if (event.sender !== mainWindow?.webContents) return [];
+    const primary = screen.getPrimaryDisplay();
+    return screen.getAllDisplays().map((display, index) => ({ id: String(display.id), name: display.label || `Ecrã ${index + 1}`, primary: display.id === primary.id }));
+  });
+  ipcMain.handle("displays:assign", (event, target, id) => {
+    if (event.sender !== mainWindow?.webContents || typeof target !== "string" || !/^(main|stageset-lyrics-\d+|stageset-lyrics-mosaic)$/.test(target)) return false;
+    if (!id) { displayAssignments.delete(target); return true; }
+    const display = screen.getAllDisplays().find((item) => String(item.id) === id);
+    if (!display) return false;
+    displayAssignments.set(target, id);
+    if (target === "main") { const wasFull = mainWindow.isFullScreen(); if (wasFull) mainWindow.setFullScreen(false); mainWindow.setPosition(display.workArea.x, display.workArea.y); if (wasFull) mainWindow.setFullScreen(true); }
+    else { const child = displayWindows.get(target); if (child && !child.isDestroyed()) child.setPosition(display.workArea.x, display.workArea.y); }
+    return true;
+  });
   app.on("second-instance", () => {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -54,9 +79,9 @@ if (!hasSingleInstance) {
 
 async function startDesktop() {
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === "midi" || permission === "media");
+    callback(["midi", "midiSysex", "media"].includes(permission) && _webContents.getURL().startsWith(localUrl + '/'));
   });
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => permission === "midi" || permission === "media");
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission, origin) => ["midi", "midiSysex", "media"].includes(permission) && origin === localUrl);
 
   const serverPath = path.join(__dirname, "..", "server.mjs");
   const { createStageSetServer } = await import(pathToFileURL(serverPath).href);
@@ -88,8 +113,9 @@ function createWindow() {
     },
   });
   mainWindow.webContents.setWindowOpenHandler(({ frameName }) => frameName?.startsWith("stageset-lyrics-")
-    ? { action: "allow", overrideBrowserWindowOptions: { width: 1100, height: 700, minWidth: 360, minHeight: 280, autoHideMenuBar: true } }
+    ? { action: "allow", overrideBrowserWindowOptions: { width: 1100, height: 700, minWidth: 360, minHeight: 280, autoHideMenuBar: true, ...(() => { const display = screen.getAllDisplays().find((item) => String(item.id) === displayAssignments.get(frameName)); return display ? { x: display.workArea.x, y: display.workArea.y } : {}; })() } }
     : { action: "deny" });
+  mainWindow.webContents.on("did-create-window", (child, details) => { displayWindows.set(details.frameName, child); child.once("closed", () => { if (displayWindows.get(details.frameName) === child) displayWindows.delete(details.frameName); }); });
   mainWindow.webContents.on("will-navigate", (event, destination) => {
     let origin = "";
     try { origin = new URL(destination).origin; } catch {}
@@ -100,6 +126,7 @@ function createWindow() {
 }
 
 app.on("before-quit", () => {
+  ipMidi.stop();
   if (server?.listening) server.close();
 });
 

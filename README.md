@@ -1,10 +1,20 @@
 # StageSet
 
+**Versão 0.9.0 — Windows x64.** [Alterações e verificação](STAGESET-ALTERACOES.md) · [Continuar noutro PC](docs/CONTINUAR.md).
+
+Principal: [StageSet-Nova](https://github.com/luisrodr123/StageSet-Nova). Cópia privada: [StageSet-0.8](https://github.com/luisrodr123/StageSet-0.8). Ambos recebem o mesmo código; o nome do backup mantém a versão de origem.
+
+Para desenvolver: Node.js 24, `npm ci`, `npm run desktop`. Para distribuir: `npm run check`, `npm test`, `npm run test:smoke`, `npm run dist:win:all`. O workflow **Windows** do GitHub gera o instalador e o portátil nos artefactos de cada execução bem-sucedida.
+
+As bibliotecas e músicas não estão no GitHub: transferi-las pelo backup de show da aplicação. Os EXE ficam em `dist/` localmente ou nas Releases quando publicados. A versão portátil não exige instalação; a biblioteca continua guardada no perfil do utilizador.
+
+Novo na 0.9: dez portas IP MIDI de 16 canais no desktop, emissão/leitura MTC e SMPTE/LTC, controlos por saída no mosaico, Learn MIDI e teclado por botão e correções de BPM/backup. Os testes de protocolo e da interface são automáticos; falta ensaio com interfaces físicas, vários monitores e dois PCs. Ver o guia para os limites dos protocolos.
+
 StageSet is a clean-room prototype for a musician's setlist and lyrics player, inspired by the publicly documented feature categories of ShowPlay 6. It does not include ShowPlay's source code, assets, branding, or license logic. The app version is shown in the top bar; each feature increment advances the minor version by 0.1. The desktop package version uses the matching patch-zero form.
 
 ## Run
 
-Requires Node.js 20 or later. From this directory:
+Requires Node.js 22.12 or later. From this directory:
 
 ```bash
 npm start
@@ -16,7 +26,7 @@ The app requests MIDI, microphone, and camera access during startup, then closes
 
 ## Windows desktop app
 
-The desktop shell opens the same app in its own window at http://127.0.0.1:4178, separate from the browser server on port 4177. Its stable desktop origin keeps IndexedDB available across launches and avoids colliding with npm start. The window can be resized down to 380 × 520 px; the layout reflows for narrow tablet screens, putting playback and lyrics above the library and setlist. With Node.js 20 or later, run npm install once, then npm run desktop. Electron downloads its runtime on the first desktop launch. On Windows, run npm run dist:win:all to build both the per-user NSIS installer (`StageSet-0.6.0-Setup-x64.exe`) and the no-install portable executable (`StageSet-0.6.0-Portable-x64.exe`). You can also build either one with npm run dist:win or npm run dist:win:portable; npm run dist:win:zip remains available for the unpacked portable ZIP. Packaging requires the Electron runtime and Windows build tools in the local cache; the first build may need GitHub access to download them. The installer is unsigned for local testing. Leave enough free space for the unpacked Electron runtime and installer output; a few hundred megabytes is not sufficient.
+The desktop shell opens the same app in its own window at http://127.0.0.1:4178, separate from the browser server on port 4177. Its stable desktop origin keeps IndexedDB available across launches and avoids colliding with npm start. The window can be resized down to 380 × 520 px; the layout reflows for narrow tablet screens, putting playback and lyrics above the library and setlist. With Node.js 22.12 or later, run npm install once, then npm run desktop. npm ci downloads the official Electron runtime. On Windows, run npm run dist:win:all to build both the per-user NSIS installer (`StageSet-0.9.0-Setup-x64.exe`) and the no-install portable executable (`StageSet-0.9.0-Portable-x64.exe`). You can also build either one with npm run dist:win or npm run dist:win:portable; npm run dist:win:zip remains available for the unpacked portable ZIP. Packaging requires the Electron runtime and Windows build tools in the local cache; the first build may need GitHub access to download them. The installer is unsigned for local testing. Leave enough free space for the unpacked Electron runtime and installer output; a few hundred megabytes is not sufficient.
 
 On Windows, open that address in Edge or Chrome and use the browser's install-as-app command when available to get a standalone StageSet window. The app shell is cached for offline launches after the first visit; library media and metadata remain in that browser profile's IndexedDB. `server.mjs` only listens on `127.0.0.1`.
 
@@ -62,7 +72,7 @@ On Windows, open that address in Edge or Chrome and use the browser's install-as
 - Attach a MIDI/KAR layer to an MP3/WAV song and control the two sources together with synchronized transport and a shared output-volume control.
 - Add up to 31 independent audio stems to a selected song, keep them synchronized with playback, and mix each stem with volume, pan, mute, and solo controls.
 - Import a ZIP containing audio stems, including the all-stems ZIP exported by [StemDeck](https://github.com/stemdeckapp/stemdeck): select a song in Studio, choose **Pistas**, and select the ZIP. Each WAV/audio file is added as its own mixer channel. StemDeck performs the source separation; StageSet imports and plays the exported files locally.
-- Set an optional pause between queued songs and hide the setlist during playback; the setlist returns when the song ends.
+- Set an optional pause between queued songs, choose Next or Stop, and hide previously played setlist songs while retaining the current song.
 - Edit the current lyric phrase with Ctrl+E, or select text and use Ctrl+Shift+E to replace it in the current lyric line.
 - Sync `[bar:beat]` lyric markers against MIDI timing and time-signature events; preserve those markers as references when the selected song is not MIDI.
 - Show the current MIDI measure and beat while the song plays.

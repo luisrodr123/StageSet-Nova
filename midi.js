@@ -15,7 +15,7 @@ function readVariableLength(bytes, cursor, end) {
 }
 
 function tickClock(tempoEvents, ticksPerQuarter) {
-  const ordered = [...tempoEvents, { tick: 0, tempo: 500000 }].sort((a, b) => a.tick - b.tick);
+  const ordered = [{ tick: 0, tempo: 500000 }, ...tempoEvents].sort((a, b) => a.tick - b.tick);
   const points = [];
   let tick = 0;
   let seconds = 0;
@@ -228,7 +228,9 @@ export function parseMidiFile(buffer) {
       beat: Math.floor((localTick % ticksPerBar) / beatTicks) + 1,
     };
   };
-  return { format, ticksPerQuarter, notes: timedNotes, channels, controllers, programChanges, lyrics, duration, barBeatToSeconds, positionToBarBeat, tickAtSeconds: clock.tickAtSeconds };
+  const firstTempo = [...tempoEvents].sort((a, b) => a.tick - b.tick)[0];
+  const tempo = firstTempo && firstTempo.tick === 0 ? 60000000 / firstTempo.tempo : 120;
+  return { format, ticksPerQuarter, tempo, notes: timedNotes, channels, controllers, programChanges, lyrics, duration, barBeatToSeconds, positionToBarBeat, tickAtSeconds: clock.tickAtSeconds };
 }
 
 function encodeVariableLength(value) {

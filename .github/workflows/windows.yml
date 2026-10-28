@@ -1,0 +1,44 @@
+name: Windows - verificar e gerar StageSet
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:smoke
+      - run: npm run dist:win:all
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: node scripts/checksums.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StageSet-Windows-${{ github.sha }}
+          path: |
+            dist/StageSet-*-Setup-x64.exe
+            dist/StageSet-*-Portable-x64.exe
+            dist/SHA256SUMS.txt
+            STAGESET-ALTERACOES.md
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: StageSet-verificacao
+          path: |
+            dist/smoke-result.json
+            dist/qa/*.png
+          if-no-files-found: ignore

@@ -7,3 +7,14 @@ dist/
 .DS_Store
 Thumbs.db
 desktop.ini
+*.stagebackup
+*.stageset
+*.sstbk
+*.wav
+*.mp3
+*.flac
+*.kar
+*.mid
+*.midi
+*.cdg
+*.pdf

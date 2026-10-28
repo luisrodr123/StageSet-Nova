@@ -3,6 +3,8 @@ import { CdgDecoder } from "./cdg.js";
 import { isDocumentSong, readDocumentText } from "./documents.js";
 import { extractMp3CdgPairs, extractAudioStems } from "./zip-import.js";
 import { createBackup, readBackup } from "./backup.js";
+import { NetworkMidi } from './network-midi.js';
+import { setupSync } from './sync.js';
 
 if ("serviceWorker" in navigator && (location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -13,11 +15,31 @@ const DB_VERSION = 1;
 const STORE = "songs";
 const validSelectTypes = ["cc", "program", "note", "song"];
 const savedSelectType = localStorage.getItem("stageset-midi-select-type");
+let buttonShortcuts = {};
+try { buttonShortcuts = JSON.parse(localStorage.getItem("stageset-button-shortcuts") || "{}"); } catch {}
+let buttonLearnTarget = null;
+const shortcutMidiDown = new Set();
+function buttonKey(button){
+  if(button.id)return button.id;
+  const scope=button.closest('[data-learn-scope]')||button.parentElement.closest('[id]')||document.body;
+  const path=[];let el=button;
+  while(el!==scope&&el){path.unshift([...el.parentElement.children].indexOf(el));el=el.parentElement;}
+  return 'learn:'+JSON.stringify([scope.dataset.learnScope||scope.id||'body',...path]);
+}
+function shortcutButton(key){return document.getElementById(key)||[...document.querySelectorAll('button')].find(button=>buttonKey(button)===key);}
+function assignButtonShortcut(kind,value){const old=buttonShortcuts[buttonLearnTarget]||{};buttonShortcuts[buttonLearnTarget]={...(old.type?{[old.type==='key'?'key':'midi']:old}:old),[kind]:value};localStorage.setItem('stageset-button-shortcuts',JSON.stringify(buttonShortcuts));buttonLearnTarget=null;}
+let buttonLearnKind='key';
+document.addEventListener('contextmenu',event=>{
+  const button=event.target.closest('button');if(!button||button.disabled||!requireStudio())return;
+  event.preventDefault();buttonLearnTarget=buttonKey(button);buttonLearnKind='pending';
+  $('#learn-button-name').textContent=button.getAttribute('aria-label')||button.title||button.textContent.trim();$('#learn-modal').hidden=false;
+});
+
 function loadDisplayOutputs() {
   const fallback = ["Vocalista", "Banda", "Público", "Teleponto"].map((name, index) => ({ id: String(index + 1), name, color: ["#65e2c1", "#79a9ff", "#f0b36c", "#d59aff"][index] }));
   try {
     const saved = JSON.parse(localStorage.getItem("stageset-display-outputs") || "null");
-    if (Array.isArray(saved)) return saved.slice(0, 8).map((item, index) => ({ id: String(item.id || index + 1), name: String(item.name || `Ecrã ${index + 1}`).slice(0, 40), color: /^#[\da-f]{6}$/i.test(item.color) ? item.color : fallback[index % fallback.length].color }));
+    if (Array.isArray(saved)) return saved.slice(0, 8).map((item, index) => ({ id: String(item.id || index + 1), name: String(item.name || `Ecrã ${index + 1}`).slice(0, 40), displayId: String(item.displayId || ""), color: /^#[\da-f]{6}$/i.test(item.color) ? item.color : fallback[index % fallback.length].color }));
   } catch {}
   localStorage.setItem("stageset-display-outputs", JSON.stringify(fallback));
   return fallback;
@@ -27,6 +49,14 @@ const state = { songs: [], setlist: [], quickies: loadQuickies(), quickiePlaying
 const $ = (selector) => document.querySelector(selector);
 const audio = $("#audio");
 const midiPlayer = new MidiPlayer();
+let syncController;
+const networkMidi = new NetworkMidi((event,id)=>syncController?.receiveMidi(event,id), error=>{
+  renderMidiInputs();renderMidiOutputs();syncController?.refreshPorts();
+  $("#ip-midi-status").textContent=error||`${networkMidi.outputs.size} portas ligadas · 16 canais em cada porta`;
+  if(error)toast(error);
+});
+function allMidiInputs(){return [...(state.midiAccess?.inputs.values()||[]),...networkMidi.inputs.values()].filter(p=>p.state!=="disconnected");}
+function allMidiOutputs(){return [...(state.midiAccess?.outputs.values()||[]),...networkMidi.outputs.values()].filter(p=>p.state!=="disconnected");}
 let midiData = null;
 let pitchContext = null;
 let pitchNode = null;
@@ -51,6 +81,7 @@ let editingLyricsSongId = null;
 let editingLyricsOutput = "main";
 let lyricsEditorOutputOnly = false;
 let lyricsEditorDrafts = {};
+let lyricsAutoSaveTimer = null;
 let editingCcSongId = null;
 let settingStudioPassword = false;
 let cdgDecoder = null;
@@ -113,6 +144,7 @@ function openStudioPassword() {
   $("#studio-password-title").textContent = settingStudioPassword ? "Criar palavra-passe do Studio" : "Entrar no Studio";
   $("#studio-password-confirm-field").hidden = !settingStudioPassword;
   $("#studio-password-confirm").required = settingStudioPassword;
+  $("#studio-password-confirm-field").style.display = settingStudioPassword ? "" : "none";
   $("#studio-password-submit").textContent = settingStudioPassword ? "Criar e entrar" : "Entrar no Studio";
   $("#studio-password-help").textContent = settingStudioPassword
     ? "Define uma palavra-passe com pelo menos 6 caracteres. O StageSet abre sempre em modo Live."
@@ -810,8 +842,11 @@ function renderAudioMixer() {
       const detail = `Saída mono · canal ${channel + 1}`;
       const row = document.createElement("div");
       row.className = "audio-channel-row";
+      row.dataset.learnScope="audio-channel-"+channel;
       row.innerHTML = `<div class="audio-channel-label"><strong></strong><span>Canal ${channel + 1}</span></div><label class="midi-mix-control"><span>Volume</span><output></output><input class="audio-channel-volume" type="range" min="0" max="1" step="0.01" /></label><label class="midi-mix-control"><span>Pan</span><output></output><input class="audio-channel-pan" type="range" min="-1" max="1" step="0.01" /></label><label class="midi-mix-control audio-output-pair-control"><span>Saída</span><select class="audio-channel-output"></select></label><button class="midi-channel-solo audio-channel-solo" type="button"></button><button class="midi-channel-mute audio-channel-mute" type="button"></button>`;
-      row.querySelector(".audio-channel-label strong").textContent = label;
+      const channelName = document.createElement("input"); channelName.value = song.audioChannelNames?.[channel] || label; channelName.maxLength = 80; channelName.setAttribute("aria-label", `Nome do canal ${channel + 1}`);
+      channelName.addEventListener("change", () => { song.audioChannelNames ??= {}; song.audioChannelNames[channel] = channelName.value.trim() || label; channelName.value = song.audioChannelNames[channel]; void dbPut(song).catch(() => toast("Não foi possível guardar o nome do canal.")); });
+      row.querySelector(".audio-channel-label strong").replaceWith(document.createTextNode(`${channel + 1} · `), channelName);
       row.querySelector(".audio-channel-label span").textContent = detail;
       const volume = row.querySelector(".audio-channel-volume");
       const volumeOutput = volume.parentElement.querySelector("output");
@@ -879,11 +914,13 @@ function renderAudioMixer() {
       updateButtons();
       container.append(row);
     }
-    for (const stem of song.audioStems ?? []) {
+    for (const [stemIndex, stem] of (song.audioStems ?? []).entries()) {
       const row = document.createElement("div");
       row.className = "audio-channel-row";
       row.innerHTML = `<div class="audio-channel-label"><strong></strong><span>Pista importada</span><button class="stem-remove" type="button" title="Remover pista" aria-label="Remover pista">×</button></div><label class="midi-mix-control"><span>Volume</span><output></output><input class="audio-channel-volume" type="range" min="0" max="1" step="0.01" /></label><label class="midi-mix-control"><span>Pan</span><output></output><input class="audio-channel-pan" type="range" min="-1" max="1" step="0.01" /></label><label class="midi-mix-control audio-output-pair-control"><span>Saída</span><select class="audio-channel-output"></select></label><button class="midi-channel-solo" type="button"></button><button class="midi-channel-mute" type="button"></button>`;
-      row.querySelector(".audio-channel-label strong").textContent = stem.name;
+      const stemName = document.createElement("input"); stemName.value = stem.name; stemName.maxLength = 80; stemName.setAttribute("aria-label", `Nome da pista ${controlCount + stemIndex + 1}`);
+      stemName.addEventListener("change", () => { stem.name = stemName.value.trim() || stem.fileName; stemName.value = stem.name; void dbPut(song).catch(() => toast("Não foi possível guardar o nome da pista.")); });
+      row.querySelector(".audio-channel-label strong").replaceWith(document.createTextNode(`${controlCount + stemIndex + 1} · `), stemName);
       row.querySelector(".audio-channel-label span").textContent = stem.fileName;
       const volume = row.querySelector(".audio-channel-volume");
       volume.value = String(stem.volume ?? 1);
@@ -950,7 +987,7 @@ async function setAudioTranspose(semitones) {
 function loadPedalMappings() {
   try {
     const saved = JSON.parse(localStorage.getItem("stageset-pedals") || "null");
-    return Array.isArray(saved) && saved.length === 4
+    return Array.isArray(saved) && saved.length >= 1
       ? saved
       : Array.from({ length: 4 }, () => ({ trigger: null, action: "none" }));
   } catch {
@@ -1125,11 +1162,30 @@ function renderLyricsEditorPreview() {
   preview.replaceChildren();
   const lines = textarea.value.split("\n");
   lines.forEach((line, index) => {
-    appendColoredLyricText(preview, line);
-    if (index < lines.length - 1) preview.append(document.createElement("br"));
+    const row = document.createElement("div"); row.className = "editor-preview-line"; row.dataset.sourceIndex = String(index);
+    appendColoredLyricText(row, line); if (!line) row.append(document.createTextNode("\u00a0")); preview.append(row);
   });
   preview.scrollTop = textarea.scrollTop;
   preview.scrollLeft = textarea.scrollLeft;
+  updateLyricsEditorFocus(false);
+}
+
+let editorFocusIndex = -1;
+function updateLyricsEditorFocus(follow = true) {
+  const modal = $("#lyrics-editor-modal"), textarea = $("#lyrics-editor-text"), preview = $("#lyrics-editor-preview");
+  if (!modal || modal.hidden || !textarea || !preview || editingLyricsSongId !== state.currentId) return;
+  const parsed = parseLyrics(textarea.value), position = currentPosition();
+  const timed = parsed.timeLines.length ? parsed.timeLines : midiData?.barBeatToSeconds ? parsed.barBeatLines.map((line) => ({ ...line, time: midiData.barBeatToSeconds(line.bar, line.beat) })).sort((a, b) => a.time - b.time) : [];
+  let index = -1;
+  if (timed.length) index = timed.reduce((found, line) => line.time <= position ? line.sourceIndex : found, -1);
+  else { const lines = textarea.value.split("\n"); if (lines.some((line) => line.trim())) index = state.autoScroll && currentDuration() ? Math.min(lines.length - 1, Math.floor(position / currentDuration() * lines.length)) : Math.max(0, Math.min(lines.length - 1, state.manualLyricOffset)); }
+  const previous = preview.querySelector(".editor-preview-current"); if (previous) previous.classList.remove("editor-preview-current");
+  const row = index >= 0 ? preview.children[index] : null;
+  if (row) { row.classList.add("editor-preview-current"); row.style.backgroundColor = colorWithAlpha(lyricOutputSettings(selectedSong(), editingLyricsOutput).highlightColor || state.lyricHighlightColor); }
+  if (follow && index !== editorFocusIndex && row && isPlaying() && document.activeElement !== textarea) {
+    textarea.scrollTop = Math.max(0, row.offsetTop - textarea.clientHeight / 2 + row.offsetHeight / 2); preview.scrollTop = textarea.scrollTop;
+  }
+  editorFocusIndex = index;
 }
 
 function renderedLyricSource(element) {
@@ -1189,16 +1245,18 @@ function broadcastLyricWindows(lines, currentIndex = -1) {
   if (state.mosaicWindow && !state.mosaicWindow.closed) state.displayOutputs.forEach((output, index) => {
     const target = output.id, prefs = lyricOutputSettings(song, target);
     let outputLines = [...lines], outputIndex = currentIndex;
-    const raw = song?.lyricOutputLyrics?.[target] ?? song?.lyricOutputLyrics?.[String(index + 1)];
+    const raw = song?.lyricOutputLyrics?.[target] ?? song?.lyricOutputLyrics?.[String(index + 1)] ?? song?.lyricsText;
     if (typeof raw === "string") {
       const parsed = parseLyrics(raw).timeLines;
       if (parsed.length) {
         const active = parsed.reduce((found, line, lineIndex) => line.time <= currentPosition() ? lineIndex : found, -1);
         const start = Math.max(0, Math.min(parsed.length - 5, active < 0 ? 0 : active - 2));
-        outputLines = parsed.slice(start, start + 5).map((line) => line.text); outputIndex = active < 0 ? -1 : active - start;
+        const sourceLines = raw.split(/\r?\n/);
+        outputLines = parsed.slice(start, start + 5).map((line) => (localStorage.getItem("stageset-mosaic-timestamps") === "true") ? sourceLines[line.sourceIndex] : line.text); outputIndex = active < 0 ? -1 : active - start;
       } else outputLines = raw.split(/\r?\n/);
     }
-    try { state.mosaicWindow.postMessage({ type: "stageset-mosaic", output: output.id, slot: index + 1, name: output.name, color: prefs.highlightColor || output.color, baseColor: output.color, fontSize: Number(prefs.fontSize) || 42, lines: outputLines, htmlLines: outputLines.map(coloredLyricHtml), currentIndex: outputIndex }, "*"); } catch {}
+    if (!(localStorage.getItem("stageset-mosaic-timestamps") === "true")) outputLines = outputLines.map((line) => line.replace(/\[(?:\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?)\]\s*/g, ""));
+    try { state.mosaicWindow.postMessage({ type: "stageset-mosaic", displays: availableDisplays, desktop: !!window.stageSetDesktop, displayId: output.displayId || "", timestamps: localStorage.getItem("stageset-mosaic-timestamps") === "true", output: output.id, slot: index + 1, name: output.name, color: prefs.highlightColor || output.color, baseColor: output.color, fontSize: Number(prefs.fontSize) || 42, lines: outputLines, htmlLines: outputLines.map(coloredLyricHtml), currentIndex: outputIndex }, "*"); } catch {}
   });
 }
 
@@ -1224,7 +1282,7 @@ function lyricMidiOutput(song, channel) {
   const route = Number.isInteger(channel) ? song?.midiOutputIds?.[channel] : undefined;
   if (route === "internal") return null;
   const id = route && route !== "inherit" ? route : state.midiOutputId;
-  return id ? [...(state.midiAccess?.outputs.values() ?? [])].find((output) => output.id === id && output.state !== "disconnected") ?? null : null;
+  return id ? allMidiOutputs().find((output) => output.id === id && output.state !== "disconnected") ?? null : null;
 }
 
 function sendEmbeddedMidiCommand(song, command) {
@@ -1340,10 +1398,17 @@ function saveSetlistCcConfig() {
   const needsNumber = state.setlistMidiType === "cc";
   $("#setlist-cc-number").disabled = !state.setlistCcEnabled || !needsNumber;
   $("#setlist-cc-number-label").hidden = !needsNumber;
+  $("#setlist-cc-number-label").style.display = needsNumber ? "" : "none";
   $("#setlist-cc-channel").closest("label").hidden = state.setlistMidiType === "song";
   $("#setlist-cc-number-label").firstChild.textContent = "Número do Control Change (CC)";
   $("#setlist-midi-type-hint").hidden = needsNumber;
   $("#setlist-midi-type-hint").textContent = ({ program: "Atribui o número Program Change em cada linha da setlist (PC).", note: "Atribui a nota MIDI em cada linha da setlist.", song: "Atribui o Song Select em cada linha da setlist." })[state.setlistMidiType] || "";
+  $("#midi-assign-value-label").textContent = ({ cc: "Valor CC", program: "Número Program Change", note: "Número da nota", song: "Número Song Select" })[state.setlistMidiType];
+  const songSelect = $("#midi-assign-song"), previousSong = songSelect.value; songSelect.replaceChildren(new Option("Escolhe uma música", ""));
+  state.setlist.forEach((id) => { const song = state.songs.find((item) => item.id === id); if (song) songSelect.add(new Option(song.title, id)); });
+  if ([...songSelect.options].some((option) => option.value === previousSong)) songSelect.value = previousSong;
+  const selectedMapping = songMidiSelectMapping(state.songs.find((song) => song.id === songSelect.value));
+  $("#midi-assign-value").value = selectedMapping ? String(selectedMapping.value) : "";
   $("#setlist-cc-number").title = needsNumber ? "Número do controlador CC a monitorizar" : "O número/mensagem é atribuído em cada linha da setlist";
   $("#setlist-midi-learn").textContent = state.learningSetlistMidi ? "A ouvir MIDI…" : "Aprender mensagem MIDI";
   $("#setlist-midi-learn").disabled = state.learningSetlistMidi;
@@ -1391,7 +1456,7 @@ function renderPedalMap() {
   if ($("#setlist-cc-enabled")) saveSetlistCcConfig();
   state.pedalMappings.forEach((mapping, index) => {
     const row = document.createElement("div");
-    row.className = "pedal-row";
+    row.className = "pedal-row";row.dataset.learnScope="pedal-"+index;
     row.innerHTML = `<span class="pedal-name">Pedal ${index + 1}</span><span class="pedal-signal"></span><div class="pedal-action-cell"><button class="pedal-learn" type="button"></button><select class="pedal-action" aria-label="Ação do pedal ${index + 1}"></select></div>`;
     row.querySelector(".pedal-signal").textContent = formatPedalTrigger(mapping.trigger);
     const learn = row.querySelector(".pedal-learn");
@@ -1451,11 +1516,11 @@ function renderMidiMixer() {
   const container = $("#midi-mixer-list");
   container.innerHTML = "";
   const activeChannels = midiData.channels;
-  const outputs = state.midiAccess ? [...state.midiAccess.outputs.values()].filter((output) => output.state !== "disconnected") : [];
+  const outputs = allMidiOutputs();
   for (const channel of activeChannels) {
     const settings = song.midiMix[channel.channel];
     const row = document.createElement("div");
-    row.className = "midi-channel-row";
+    row.className = "midi-channel-row";row.dataset.learnScope="midi-channel-"+channel.channel;
     row.innerHTML = `<div class="midi-channel-label"><strong></strong><span class="midi-channel-meta"></span><label class="midi-program-control"><span>Timbre sintetizado</span><select class="midi-channel-program" aria-label="Timbre sintetizado do canal ${channel.channel + 1}"></select></label></div><label class="midi-mix-control"><span>Volume</span><output></output><input class="midi-channel-volume" type="range" min="0" max="1" step="0.01" /></label><label class="midi-mix-control"><span>Pan</span><output></output><input class="midi-channel-pan" type="range" min="-1" max="1" step="0.01" /></label><button class="midi-channel-solo" type="button"></button><button class="midi-channel-mute" type="button"></button>`;
     const outputControl = document.createElement("label");
     outputControl.className = "midi-output-control";
@@ -1560,7 +1625,7 @@ function renderMidiMixer() {
 function renderMidiInputs() {
   renderMidiOutputs();
   const select = $("#pedal-device");
-  const inputs = state.midiAccess ? [...state.midiAccess.inputs.values()].filter((input) => input.state !== "disconnected") : [];
+  const inputs = allMidiInputs();
   const previousId = state.pedalInputId;
   select.innerHTML = "";
   if (!inputs.length) {
@@ -1579,9 +1644,10 @@ function renderMidiInputs() {
 }
 
 function renderMidiOutputs() {
+  syncController?.refreshPorts();
   const select = $("#midi-output-device");
   if (!select) return;
-  const outputs = state.midiAccess ? [...state.midiAccess.outputs.values()].filter((output) => output.state !== "disconnected") : [];
+  const outputs = allMidiOutputs();
   select.innerHTML = "";
   select.add(new Option("Sintetizador interno", "internal"));
   for (const output of outputs) select.add(new Option(output.name || "Saída MIDI", output.id));
@@ -1622,6 +1688,18 @@ function onPedalMessage(event, inputId) {
   const isControl = command === 0xb0;
   const isProgramChange = command === 0xc0;
   if (!isNoteOn && !isNoteOff && !isControl && !isProgramChange && !isSongSelect) return;
+  const shortcutTrigger = `${inputId}:${isControl ? 'cc' : 'note'}:${channel}:${number}`;
+  const shortcutPressed = isNoteOn || (isControl && value >= 64);
+  const shortcutRising = !shortcutMidiDown.has(shortcutTrigger);
+  if (shortcutPressed) shortcutMidiDown.add(shortcutTrigger); else if (!isProgramChange) shortcutMidiDown.delete(shortcutTrigger);
+  if (buttonLearnTarget && buttonLearnKind === "midi" && (isNoteOn || (isControl && value >= 64) || isProgramChange)) {
+    assignButtonShortcut("midi", { type: "midi", inputId, status, number });
+    buttonLearnTarget = null; toast("Atalho MIDI guardado."); return;
+  }
+  if (isNoteOn || (isControl && value >= 64) || isProgramChange) {
+    const match = Object.entries(buttonShortcuts).map(([id,s])=>[id,s.midi||s]).find(([, shortcut]) => shortcut.type === "midi" && shortcut.inputId === inputId && shortcut.status === status && shortcut.number === number);
+    if (match) { const button = shortcutButton(match[0]); if (button && !button.disabled && button.getClientRects().length) { if (isProgramChange || shortcutRising) button.click(); return; } }
+  }
   if (state.learningSongMidiId === editingCcSongId && state.learningSongMidiId) {
     const type = $("#song-cc-type").value;
     const matches = (type === "cc" && isControl) || (type === "program" && isProgramChange) || (type === "note" && isNoteOn) || (type === "song" && isSongSelect);
@@ -1744,7 +1822,7 @@ function performPedalAction(action, triggerId = "") {
   }
 }
 
-async function requestMidiAccess({ notify = false } = {}) {
+async function requestMidiAccess({ notify = false, sysex = false } = {}) {
   if (!navigator.requestMIDIAccess) {
     state.midiPermissionStatus = "unavailable";
     $("#pedal-status").textContent = "API MIDI indisponível neste endereço";
@@ -1755,7 +1833,7 @@ async function requestMidiAccess({ notify = false } = {}) {
     return false;
   }
   try {
-    state.midiAccess = await navigator.requestMIDIAccess({ software: true });
+    state.midiAccess = await navigator.requestMIDIAccess({ software: true, sysex: sysex || state.midiAccess?.sysexEnabled || false });
     state.midiPermissionStatus = "granted";
     state.midiAccess.onstatechange = () => {
       renderMidiInputs();
@@ -1894,9 +1972,11 @@ function saveSetlistPreferences() {
   state.interSongDelay = Math.max(0, Math.min(3600, Number($("#inter-song-delay").value) || 0));
   localStorage.setItem("stageset-hide-setlist", String(state.hideSetlistDuringPlayback));
   localStorage.setItem("stageset-inter-song-delay", String(state.interSongDelay));
+  localStorage.setItem("stageset-queue-end-action", $("#queue-end-action").value);
   $("#inter-song-delay").value = String(state.interSongDelay);
-  if (!state.hideSetlistDuringPlayback) state.queueDisplayHidden = false;
-  $(".setlist-panel").classList.toggle("queue-hidden", state.queueDisplayHidden);
+  state.queueDisplayHidden = false;
+  $(".setlist-panel").classList.remove("queue-hidden");
+  renderSetlist();
 }
 
 function hasValidLoop(song) {
@@ -2024,6 +2104,9 @@ function renderLibrary() {
     const row = document.createElement("div");
     row.className = `library-song${song.id === state.currentId ? " selected" : ""}${state.expandedLibrarySongId === song.id ? " expanded" : ""}${setlistHasSong(song.id) ? " in-setlist" : ""}${state.playedSongIds.has(song.id) ? " played" : ""}`;
     row.innerHTML = `<button class="library-select" type="button" aria-expanded="${state.expandedLibrarySongId === song.id}"><span class="song-note">♫</span><span class="library-song-copy"><strong></strong></span><span class="song-duration">${formatTime(song.duration)}</span></button><div class="library-song-details" ${state.expandedLibrarySongId === song.id ? "" : "hidden"}></div><button class="library-action favorite-toggle${song.favorite ? " is-favorite" : ""}" type="button" title="Alternar favorita" aria-label="Alternar favorita" data-studio-only>★</button><button class="library-action library-edit" data-studio-only type="button" title="Renomear ou editar" aria-label="Editar item">✎</button><button class="library-action library-copy" data-studio-only type="button" title="Fazer uma cópia" aria-label="Copiar item">⧉</button><button class="library-action library-delete" data-studio-only type="button" title="Eliminar da biblioteca" aria-label="Eliminar item">×</button><button class="library-action library-cc" data-studio-only type="button" title="Atribuir mensagem MIDI" aria-label="Configurar seleção MIDI">CC</button><button class="library-add" data-studio-only type="button" title="Adicionar à setlist" aria-label="Adicionar à setlist">+</button>`;
+    row.insertBefore(row.querySelector(".library-cc"), row.querySelector(".favorite-toggle"));
+    row.insertBefore(row.querySelector(".library-add"), row.querySelector(".favorite-toggle"));
+    row.querySelectorAll("button").forEach((button, index) => { button.id = `library-${song.id}-${index}`; });
     row.querySelector("strong").textContent = song.title;
     row.querySelector(".song-note").textContent = isDocumentSong(song) ? song.fileName.split(".").at(-1).toUpperCase() : "♫";
     row.querySelector(".song-note").classList.toggle("document-note", isDocumentSong(song));
@@ -2184,14 +2267,14 @@ function showLyricsEditorOutput(target, storeDraft = true) {
   $("#lyrics-output-font-size").value = String(fontSize);
   $("#lyrics-output-font-label").textContent = `${fontSize} px`;
   $("#lyrics-output-highlight").value = prefs.highlightColor || (target === "main" ? song.lyricHighlightColor || state.lyricHighlightColor : output?.color || "#65e2c1");
-  $("#lyrics-export-kar").disabled = target !== "main";
-  $("#lyrics-export-midi").disabled = target !== "main";
+  $("#lyrics-export-kar").disabled = false;
+  $("#lyrics-export-midi").disabled = false;
   $("#lyrics-bpm").disabled = target !== "main";
   $("#lyrics-save-button").textContent = target === "main" ? "Guardar letras e tempos" : `Guardar letras de ${output?.name ?? `Ecrã ${target}`}`;
 }
 
 async function saveLyricOutputSettings(target, patch) {
-  const index = state.songs.findIndex((song) => song.id === editingLyricsSongId || song.id === state.currentId);
+  const index = state.songs.findIndex((song) => song.id === (editingLyricsSongId || state.currentId));
   if (index < 0) return;
   const song = state.songs[index];
   const key = target === "main" ? "lyricDisplaySettings" : "lyricOutputSettings";
@@ -2285,6 +2368,28 @@ async function saveLyricsEditor(event) {
   toast(updated.lyricLines.length ? "Letras e tempos guardados." : "Letras guardadas.");
 }
 
+async function autoSaveLyricsDraft() {
+  if (!editingLyricsSongId || !$("#lyrics-editor-modal") || $("#lyrics-editor-modal").hidden) return;
+  const index = state.songs.findIndex((song) => song.id === editingLyricsSongId);
+  if (index < 0) return;
+  lyricsEditorDrafts[editingLyricsOutput] = $("#lyrics-editor-text").value;
+  const outputLyrics = { ...(state.songs[index].lyricOutputLyrics ?? {}) };
+  for (const [target, text] of Object.entries(lyricsEditorDrafts)) if (target !== "main") outputLyrics[target] = text;
+  const updated = { ...state.songs[index], lyricOutputLyrics: outputLyrics };
+  if (editingLyricsOutput === "main") {
+    updated.lyricsText = lyricsEditorDrafts.main;
+    const parsed = parseLyrics(updated.lyricsText);
+    updated.lyricLines = parsed.timeLines;
+    updated.midiLyricLines = parsed.barBeatLines;
+  }
+  try {
+    await dbPut(updated);
+    state.songs[index] = updated;
+    if (state.currentId === updated.id) renderLyrics();
+    toast("Rascunho guardado automaticamente.");
+  } catch { toast("Não foi possível guardar o rascunho."); }
+}
+
 async function exportLyricsMidi(extension = "kar") {
   if (!requireStudio()) return;
   const song = state.songs.find((item) => item.id === editingLyricsSongId);
@@ -2328,7 +2433,8 @@ async function exportLyricsMidi(extension = "kar") {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${baseName}.${extension}`;
+  const outputName = editingLyricsOutput === "main" ? "Palco" : (state.displayOutputs.find((output) => output.id === editingLyricsOutput)?.name || "Saida");
+  link.download = `${baseName}-${outputName.replace(/[\\/:*?"<>|]+/g, "-")}.${extension}`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -2410,17 +2516,39 @@ function renderDisplayOutputSettings() {
   if (!container) return;
   container.replaceChildren();
   state.displayOutputs.forEach((output, index) => {
-    const row = document.createElement("div"); row.className = "display-output-row";
+    const row = document.createElement("div"); row.className = "display-output-row";row.dataset.learnScope="output-"+output.id;
     const name = document.createElement("input"); name.value = output.name; name.maxLength = 40; name.setAttribute("aria-label", `Nome da janela ${index + 1}`);
     name.addEventListener("change", () => { output.name = name.value.trim() || `Ecrã ${index + 1}`; saveDisplayOutputs(); renderDisplayOutputSettings(); showLyricsEditorOutput(editingLyricsOutput, false); broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current"))); });
     const color = document.createElement("input"); color.type = "color"; color.value = output.color; color.setAttribute("aria-label", `Cor da janela ${index + 1}`);
+    const display = document.createElement("select"); display.setAttribute("aria-label", `Saída de vídeo de ${output.name}`); display.add(new Option("Ecrã atual", ""));
+    for (const item of availableDisplays) display.add(new Option(item.name + (item.primary ? " (principal)" : ""), item.id));
+    display.value = output.displayId || ""; display.disabled = !window.stageSetDesktop?.assignDisplay;
+    display.addEventListener("change", () => { output.displayId = display.value; saveDisplayOutputs(); void window.stageSetDesktop.assignDisplay(`stageset-lyrics-${index + 1}`, display.value); });
     color.addEventListener("input", () => { output.color = color.value; saveDisplayOutputs(); if (editingLyricsOutput === output.id) showLyricsEditorOutput(output.id, false); broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current"))); });
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "backup-button"; edit.textContent = "Editar letras"; edit.addEventListener("click", () => { $("#settings-modal").hidden = true; openLyricsEditor(output.id, true); });
+    const size = document.createElement("input"); size.type = "number"; size.min = "16"; size.max = "96"; size.step = "1"; size.value = String(Number(lyricOutputSettings(selectedSong() || {}, output.id).fontSize) || 42); size.title = "Tamanho da letra para a música atual"; size.setAttribute("aria-label", `Tamanho de letra de ${output.name}`);
+    size.addEventListener("input", () => { const value = Number(size.value); if (!selectedSong() || !Number.isFinite(value) || value < 16 || value > 96) return; void saveLyricOutputSettings(output.id, { fontSize: value }); });
     const remove = document.createElement("button"); remove.type = "button"; remove.className = "backup-button"; remove.textContent = "Remover"; remove.disabled = state.displayOutputs.length <= 1;
-    remove.addEventListener("click", () => { state.displayOutputs.splice(index, 1); state.displayWindows.splice(index, 1).forEach((ref) => { try { ref?.close(); } catch {} }); saveDisplayOutputs(); renderDisplayOutputSettings(); });
-    row.append(name, color, edit, remove); container.append(row);
+    remove.addEventListener("click", () => { state.displayOutputs.splice(index, 1); state.displayWindows.splice(index, 1).forEach((ref) => { try { ref?.close(); } catch {} }); saveDisplayOutputs(); renderDisplayOutputSettings(); void refreshDisplays(); });
+    row.append(name, color, display, size, edit, remove); container.append(row);
   });
   $("#create-display-output").disabled = state.displayOutputs.length >= 8;
+}
+
+let availableDisplays = [];
+async function refreshDisplays() {
+  if (!window.stageSetDesktop?.listDisplays) { $("#display-selection-status").textContent = "A seleção automática de ecrãs está disponível na aplicação de desktop."; return; }
+  availableDisplays = await window.stageSetDesktop.listDisplays();
+  $("#display-selection-status").textContent = `${availableDisplays.length} ecrã(s) detetado(s).`;
+  for (const [selector, target, key] of [["#main-display-select", "main", "stageset-main-display"], ["#mosaic-display-select", "stageset-lyrics-mosaic", "stageset-mosaic-display"]]) {
+    const select = $(selector); select.replaceChildren(new Option("Ecrã atual", ""));
+    for (const item of availableDisplays) select.add(new Option(item.name + (item.primary ? " (principal)" : ""), item.id));
+    select.value = localStorage.getItem(key) || "";
+    if (select.value && target !== "main") await window.stageSetDesktop.assignDisplay(target, select.value);
+    select.onchange = () => { localStorage.setItem(key, select.value); void window.stageSetDesktop.assignDisplay(target, select.value); };
+  }
+  for (const [index, output] of state.displayOutputs.entries()) await window.stageSetDesktop.assignDisplay(`stageset-lyrics-${index + 1}`, output.displayId || "");
+  renderDisplayOutputSettings();
 }
 
 function saveDisplayOutputs() {
@@ -2443,13 +2571,21 @@ function addDisplayOutput() {
 }
 
 function openLyricsMosaic() {
-  if (state.mosaicWindow && !state.mosaicWindow.closed) { state.mosaicWindow.focus(); return; }
-  const display = window.open("", "stageset-lyrics-mosaic", "popup,width=1200,height=800,resizable=yes");
-  if (!display) return toast("Permite pop-ups para abrir o mosaico de letras.");
-    display.document.write(`<!doctype html><html lang="pt"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StageSet · Mosaico</title><style>*{box-sizing:border-box}body{margin:0;padding:12px;background:#10141b;color:#e7edf0;font:14px system-ui}header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;height:calc(100vh - 62px)}.tile{min-width:0;min-height:0;padding:10px;border:1px solid #35404b;border-radius:10px;display:flex;flex-direction:column;justify-content:center;text-align:center;overflow:hidden}.tile h2{font-size:14px;color:#9aa6b1;margin:0 0 10px}.tile p{font-size:clamp(18px,3vw,50px);margin:4px;padding:4px;border-radius:6px;color:#84919e}.tile .current{color:#fff}label{font-size:12px}input{accent-color:#65e2c1}</style><header><strong>Mosaico de letras</strong><span id="selectors"></span></header><main class="grid" id="grid"></main><script>const names=${JSON.stringify(state.displayOutputs.map((output) => output.name))};const chosen=new Set(names.map((_,i)=>i+1));const data=new Map();const selectors=document.querySelector('#selectors'),grid=document.querySelector('#grid');function render(){selectors.replaceChildren(...names.map((name,i)=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=chosen.has(i+1);input.onchange=()=>{input.checked?chosen.add(i+1):chosen.delete(i+1);render()};label.append(input,document.createTextNode(' '+name+' '));return label}));grid.replaceChildren(...[...chosen].map(id=>{const d=data.get(id)||{name:names[id-1],lines:[],currentIndex:-1,color:'#65e2c1',fontSize:32};const tile=document.createElement('section');tile.className='tile';tile.style.borderColor=d.baseColor||d.color;const title=document.createElement('h2');title.textContent=d.name;tile.append(title,...d.lines.map((line,index)=>{const p=document.createElement('p');if(d.htmlLines?.[index]!==undefined)p.innerHTML=d.htmlLines[index];else p.textContent=line||' ';p.className=index===d.currentIndex?'current':'';p.style.color=d.baseColor||d.color;p.style.fontSize=(d.fontSize||32)+'px';if(index===d.currentIndex)p.style.background=d.color+'55';return p}));return tile}))}addEventListener('message',e=>{if(e.source!==opener||e.data?.type!=='stageset-mosaic')return;data.set(e.data.slot,e.data);render()});render();</script></html>`);
-  display.document.close(); state.mosaicWindow = display;
-  broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current")));
+  if(state.mosaicWindow&&!state.mosaicWindow.closed){state.mosaicWindow.focus();return;}
+  state.mosaicWindow=window.open(new URL('./mosaic.html',location.href).href,'stageset-lyrics-mosaic','popup,width=1200,height=800,resizable=yes');
+  if(!state.mosaicWindow)toast('Permite pop-ups para abrir o mosaico de letras.');
 }
+function refreshMosaic(){broadcastLyricWindows(currentRenderedLyricLines(),[...document.querySelectorAll('#lyrics-content .lyric-line')].findIndex(line=>line.classList.contains('current')));}
+window.addEventListener('message',event=>{
+  if(event.source!==state.mosaicWindow)return;
+  const d=event.data;
+  if(d?.type==='stageset-mosaic-ready'){void refreshDisplays().then(refreshMosaic);return;}
+  if(d?.type==='stageset-mosaic-timestamps'){localStorage.setItem('stageset-mosaic-timestamps',String(!!d.value));refreshMosaic();return;}
+  if(d?.type!=='stageset-mosaic-setting'||!requireStudio())return;
+  const output=state.displayOutputs.find(o=>o.id===d.output);if(!output)return;
+  if(Number.isInteger(d.fontSize)&&d.fontSize>=16&&d.fontSize<=96)void saveLyricOutputSettings(output.id,{fontSize:d.fontSize});
+  if(typeof d.displayId==='string'&&window.stageSetDesktop?.assignDisplay&&(d.displayId===''||availableDisplays.some(display=>display.id===d.displayId))){output.displayId=d.displayId;saveDisplayOutputs();void window.stageSetDesktop.assignDisplay('stageset-lyrics-'+(state.displayOutputs.indexOf(output)+1),d.displayId);refreshMosaic();}
+});
 
 function setLyricHighlightColor(color) {
   if (!/^#[\da-f]{6}$/i.test(color)) return;
@@ -2468,6 +2604,7 @@ function adjustStageLyricSize(delta) {
   if (index >= 0) state.songs[index] = updated;
   $("#lyrics-content").style.setProperty("--lyric-font-size", size + "px");
   $("#lyric-size-label").textContent = Math.round(size / 25 * 100) + "%";
+  broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current")));
   void dbPut(updated).catch(() => toast("Não foi possível guardar o tamanho de letra desta música."));
 }
 
@@ -3060,9 +3197,11 @@ function renderSetlist() {
   state.setlist.forEach((id, index) => {
     const song = state.songs.find((item) => item.id === id);
     if (!song) return;
+    if (state.hideSetlistDuringPlayback && state.playedSongIds.has(id) && id !== state.currentId) return;
     const row = document.createElement("div");
     row.className = `setlist-entry${id === state.currentId ? " active" : ""}${state.playedSongIds.has(id) ? " played" : ""}`;
     row.innerHTML = `<span class="setlist-index">${String(index + 1).padStart(2, "0")}</span><span class="setlist-name" title=""></span><label class="setlist-cc-value-label" data-studio-only title="Valor MIDI para selecionar esta música"><span class="setlist-midi-value-label">CC</span><input class="setlist-cc-value" type="number" min="0" max="127" step="1" placeholder="—" aria-label="Valor MIDI de ${song.title}" /></label><button class="queue-action setlist-cc-edit" data-studio-only type="button" title="Atribuir canal e mensagem MIDI" aria-label="Configurar seleção MIDI de ${song.title}">⚙</button><button class="queue-action queue-play-next" data-studio-only type="button" title="Tocar a seguir" aria-label="Colocar ${song.title} a tocar a seguir">↪</button><button class="queue-action" data-studio-only data-move="up" title="Mover para cima" aria-label="Mover para cima">↑</button><button class="queue-action" data-studio-only data-move="down" title="Mover para baixo" aria-label="Mover para baixo">↓</button><button class="queue-action remove-entry" data-studio-only title="Remover da setlist" aria-label="Remover">×</button>`;
+    row.querySelectorAll("button").forEach((button, buttonIndex) => { button.id = `queue-${song.id}-${buttonIndex}`; });
     row.querySelector(".setlist-name").textContent = song.title;
     row.querySelector(".setlist-name").title = song.title;
     row.querySelector(".setlist-name").addEventListener("click", () => selectSong(id));
@@ -3167,7 +3306,7 @@ async function beginSongMidiLearn() {
   if (!navigator.requestMIDIAccess) return toast("Este browser não disponibiliza entrada MIDI.");
   try {
     if (!state.midiAccess) {
-      state.midiAccess = await navigator.requestMIDIAccess({ software: true });
+      state.midiAccess = await navigator.requestMIDIAccess({ software: true, sysex: state.midiAccess?.sysexEnabled || false });
       state.midiAccess.onstatechange = () => { renderMidiInputs(); renderMidiOutputs(); };
       renderMidiInputs();
       renderMidiOutputs();
@@ -3481,7 +3620,7 @@ async function selectSong(id, autoplay = false, { quickie = false } = {}) {
       for (let channel = 0; channel < 16; channel++) {
         const route = song.midiOutputIds?.[channel] ?? "inherit";
         const output = route === "inherit" ? undefined : route === "internal" ? null :
-          [...(state.midiAccess?.outputs.values() ?? [])].find((item) => item.id === route) ?? undefined;
+          allMidiOutputs().find((item) => item.id === route) ?? undefined;
         await midiPlayer.setChannelOutput(channel, output);
       }
       if (isMidiSong(song)) song.duration = midiData.duration;
@@ -3761,6 +3900,29 @@ async function addAudioStems(files, targetSong = selectedSong()) {
   }
 }
 
+function emptyAudioFile() {
+  const buffer = new ArrayBuffer(44 + 16000), view = new DataView(buffer);
+  const write = (offset, text) => [...text].forEach((character, index) => view.setUint8(offset + index, character.charCodeAt(0)));
+  write(0, "RIFF"); view.setUint32(4, 36 + 16000, true); write(8, "WAVE"); write(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 8000, true); view.setUint32(28, 16000, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, "data"); view.setUint32(40, 16000, true);
+  return new File([buffer], "silencio.wav", { type: "audio/wav" });
+}
+
+async function createGroupedSong(files, title) {
+  if (!requireStudio()) return;
+  if (!title?.trim()) return toast("Escreve o nome da música.");
+  const midiFiles = files.filter((file) => /\.(mid|midi|kar)$/i.test(file.name));
+  if (midiFiles.length > 1) return toast("Escolhe apenas um ficheiro MIDI/KAR por música.");
+  const audioFiles = files.filter((file) => !/\.(mid|midi|kar)$/i.test(file.name) && (file.type.startsWith("audio/") || /\.(mp3|wav|m4a|ogg|flac|mogg)$/i.test(file.name)));
+  const zipFiles = files.filter((file) => /\.zip$/i.test(file.name));
+  const base = audioFiles.shift() || emptyAudioFile();
+  let midi = null;
+  try { if (midiFiles[0]) { midi = parseMidiFile(await midiFiles[0].arrayBuffer()); } } catch (error) { return toast(error.message || "MIDI inválido."); }
+  let metadata;
+  try { metadata = await readAudioChannelMetadata(base); } catch (error) { return toast(error.message || "Áudio inválido."); }
+  const song = { id: crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => n.toString(16).padStart(2, "0")).join(""), title: title.trim(), artist: "", fileName: base.name, duration: 0, addedAt: Date.now(), favorite: false, playCount: 0, tags: [], audioChannels: metadata?.channels ?? 1, audioFormat: metadata?.format ?? "audio", audioBlob: base, lyricsText: "", lyricLines: [], ...(midi ? { midiBlob: midiFiles[0], midiFileName: midiFiles[0].name, bpm: midi.tempo } : {}) };
+  try { await dbPut(song); state.songs.push(song); renderLibrary(); await selectSong(song.id); if (audioFiles.length || zipFiles.length) await addAudioStems([...audioFiles, ...zipFiles], song); toast("Música criada."); } catch (error) { toast(error.message || "Não foi possível criar a música."); }
+}
+
 async function importLyrics(file) {
   if (!requireStudio()) return;
   const song = selectedSong();
@@ -3789,6 +3951,7 @@ function exportBackup() {
       quickies: state.quickies,
       hideSetlistDuringPlayback: state.hideSetlistDuringPlayback,
       interSongDelay: state.interSongDelay,
+      interfaceSettings: Object.fromEntries(transferSettingKeys.map(key=>[key,localStorage.getItem(key)])),
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -3812,6 +3975,9 @@ async function restoreBackupFile(file) {
     await dbReplaceAll(backup.songs);
     audio.pause();
     midiPlayer.pause();
+    for(const key of transferSettingKeys){const value=backup.interfaceSettings?.[key];if(typeof value==='string')localStorage.setItem(key,value);}
+    state.displayOutputs=loadDisplayOutputs();saveDisplayOutputs();
+    try{buttonShortcuts=JSON.parse(localStorage.getItem("stageset-button-shortcuts")||"{}");}catch{buttonShortcuts={};}
     state.songs = backup.songs;
     state.setlist = backup.setlist;
     state.playedSongIds = new Set(backup.playedSongIds ?? []);
@@ -3834,11 +4000,11 @@ async function restoreBackupFile(file) {
     state.pedalMappings = backup.pedalMappings
       ? backup.pedalMappings.map((mapping) => {
         const trigger = mapping?.trigger;
-        const validTrigger = trigger && (trigger.type === "note" || trigger.type === "cc") &&
+        const validTrigger = trigger && (trigger.type === "note" || trigger.type === "control" || trigger.type === "cc") &&
           Number.isInteger(trigger.number) && trigger.number >= 0 && trigger.number <= 127 &&
           Number.isInteger(trigger.channel) && trigger.channel >= 0 && trigger.channel <= 15;
         return {
-          trigger: validTrigger ? { type: trigger.type, number: trigger.number, channel: trigger.channel } : null,
+          trigger: validTrigger ? { type: trigger.type === "cc" ? "control" : trigger.type, inputId: String(trigger.inputId || ""), number: trigger.number, channel: trigger.channel } : null,
           action: validActions.has(mapping?.action) ? mapping.action : "none",
         };
       })
@@ -3862,8 +4028,7 @@ async function restoreBackupFile(file) {
     renderSetlist();
     if (state.currentId) await selectSong(state.currentId);
     else await clearCurrentSong();
-    state.playedSongIds = new Set();
-    localStorage.removeItem("stageset-played-song-ids");
+    renderSetlist();
     toast("Show aberto: " + description + ".");
   } catch (error) {
     toast(error.message || "Não foi possível restaurar esta cópia.");
@@ -3873,6 +4038,7 @@ async function restoreBackupFile(file) {
 function updatePlayback() {
   const duration = currentDuration();
   const current = currentPosition();
+  updateLyricsEditorFocus();
   $("#progress").value = duration ? String(Math.round((current / duration) * 1000)) : "0";
   $("#elapsed").textContent = formatTime(current);
   $("#remaining").textContent = `-${formatTime(Math.max(0, duration - current))}`;
@@ -3884,9 +4050,8 @@ function updatePlayback() {
   state.timelineLastPosition = current;
   if (isPlaying() && current >= embeddedMidiLastPosition) fireEmbeddedMidiActions("time", song, current);
   embeddedMidiLastPosition = current;
-  if (state.hideSetlistDuringPlayback && isPlaying()) state.queueDisplayHidden = true;
-  else if (!isPlaying()) state.queueDisplayHidden = false;
-  $(".setlist-panel").classList.toggle("queue-hidden", state.queueDisplayHidden);
+  state.queueDisplayHidden = false;
+  $(".setlist-panel").classList.remove("queue-hidden");
   if (!$("#timeline-editor-modal").hidden) drawTimelineEditor();
   if (!audio.ended) syncStemPosition();
   if (loopJumping || loopAtEnd(song, current)) return;
@@ -4028,6 +4193,7 @@ $("#settings-button").addEventListener("click", () => {
   $("#settings-lyric-highlight").value = state.lyricHighlightColor;
   $("#stem-provider").value = localStorage.getItem("stageset-stem-provider") || "stemdeck";
   renderDisplayOutputSettings(); saveDisplayOutputs();
+  void refreshDisplays().catch(() => { $("#display-selection-status").textContent = "Não foi possível detetar os ecrãs."; });
   $("#settings-modal").hidden = false;
 });
 $("#close-settings").addEventListener("click", () => { $("#settings-modal").hidden = true; });
@@ -4089,10 +4255,14 @@ $("#clear-played").addEventListener("click", () => {
 $("#clear-setlist").addEventListener("click", () => { if (!requireStudio()) return; if (queueDelayTimer) clearTimeout(queueDelayTimer); queueDelayTimer = null; state.setlist = []; persistSetlist(); renderLibrary(); renderSetlist(); toast("Setlist limpa."); });
 $("#setlist-save").addEventListener("click", exportSetlistFile);
 $("#setlist-load").addEventListener("click", () => requireStudio() && $("#setlist-file").click());
+$("#queue-save").addEventListener("click", exportSetlistFile);
+$("#queue-load").addEventListener("click", () => requireStudio() && $("#setlist-file").click());
 $("#setlist-file").addEventListener("change", (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) importSetlistFile(file); });
 $("#hide-setlist-during-playback").addEventListener("change", saveSetlistPreferences);
 $("#inter-song-delay").addEventListener("change", saveSetlistPreferences);
-$("#lyrics-edit-button").addEventListener("click", openLyricsEditor);
+$("#queue-end-action").value = localStorage.getItem("stageset-queue-end-action") === "stop" ? "stop" : "next";
+$("#queue-end-action").addEventListener("change", saveSetlistPreferences);
+$("#lyrics-edit-button").addEventListener("click", () => openLyricsEditor());
 $("#lyrics-play-button").addEventListener("click", () => $("#play").click());
 $("#lyric-size-down").addEventListener("click", () => adjustStageLyricSize(-2));
 $("#lyric-size-up").addEventListener("click", () => adjustStageLyricSize(2));
@@ -4100,13 +4270,17 @@ $("#lyrics-import-button").addEventListener("click", () => $("#lyrics-file").cli
 $("#lyrics-file").addEventListener("change", async (event) => { const file = event.target.files?.[0]; if (file) { const text = await file.text(); if (editingLyricsOutput === "main") { await importLyrics(file); $("#lyrics-editor-text").value = text; } else { $("#lyrics-editor-text").value = text; lyricsEditorDrafts[editingLyricsOutput] = text; } renderLyricsEditorPreview(); } event.target.value = ""; });
 $("#lyrics-export-kar").addEventListener("click", () => { void exportLyricsMidi("kar"); });
 $("#lyrics-export-midi").addEventListener("click", () => { void exportLyricsMidi("mid"); });
+$("#lyrics-export-text").addEventListener("click", () => { const song = selectedSong(); if (!song) return; const label = editingLyricsOutput === "main" ? "Palco" : (state.displayOutputs.find((output) => output.id === editingLyricsOutput)?.name || "Saida"); const url = URL.createObjectURL(new Blob([$("#lyrics-editor-text").value], {type:"text/plain;charset=utf-8"})); const link = document.createElement("a"); link.href = url; link.download = `${song.title}-${label}`.replace(/[\\/:*?"<>|]+/g, "-") + ".txt"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); });
+$("#lyrics-import-tempo").addEventListener("click", () => $("#lyrics-tempo-file").click());
+$("#lyrics-tempo-file").addEventListener("change", async (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; try { const midi = parseMidiFile(await file.arrayBuffer()); $("#lyrics-bpm").value = String(Math.round(midi.tempo * 10) / 10); toast(`BPM inicial: ${$("#lyrics-bpm").value}`); } catch (error) { toast(error.message || "Não foi possível ler o MIDI."); } });
+$("#add-pedal").addEventListener("click", () => { if (!requireStudio()) return; state.pedalMappings.push({trigger:null, action:"none"}); persistPedals(); renderPedalMap(); });
 $("#lyrics-learn-shortcut").addEventListener("click", async () => {
   if (!requireStudio() || !editingLyricsSongId) return;
   state.lyricShortcutLearning = true;
   $("#lyrics-learn-shortcut").textContent = "Pressiona uma tecla ou toca uma nota MIDI…";
   $("#lyrics-shortcut-status").textContent = "À espera de tecla ou nota";
   if (navigator.requestMIDIAccess && !state.midiAccess) {
-    try { state.midiAccess = await navigator.requestMIDIAccess({ software: true }); state.midiAccess.inputs.forEach(attachPedalInput); }
+    try { state.midiAccess = await navigator.requestMIDIAccess({ software: true, sysex: state.midiAccess?.sysexEnabled || false }); state.midiAccess.inputs.forEach(attachPedalInput); }
     catch { toast("MIDI indisponível; podes aprender uma tecla do teclado."); }
   }
 });
@@ -4191,7 +4365,7 @@ $("#midi-refresh-outputs").addEventListener("click", async () => {
   if (!requireStudio()) return;
   if (!navigator.requestMIDIAccess) return toast("Este browser não disponibiliza portas MIDI.");
   try {
-    state.midiAccess = await navigator.requestMIDIAccess({ software: true });
+    state.midiAccess = await navigator.requestMIDIAccess({ software: true, sysex: state.midiAccess?.sysexEnabled || false });
     state.midiAccess.onstatechange = () => { renderMidiInputs(); renderMidiOutputs(); if (!$("#midi-mixer-modal").hidden) renderMidiMixer(); };
     renderMidiInputs(); renderMidiOutputs(); renderMidiMixer();
     toast("Portas MIDI atualizadas.");
@@ -4218,6 +4392,11 @@ $("#audio-output-device").addEventListener("change", async (event) => {
 });
 if (navigator.mediaDevices?.addEventListener) navigator.mediaDevices.addEventListener("devicechange", () => refreshAudioOutputDevices());
 $("#audio-stems-button").addEventListener("click", () => selectedSong() ? $("#audio-stems-files").click() : toast("Escolhe uma música primeiro."));
+$("#create-song").addEventListener("click", () => { if (!requireStudio()) return; $("#new-song-name").value = ""; $("#new-song-modal").hidden = false; $("#new-song-name").focus(); });
+$("#cancel-new-song").addEventListener("click", () => { $("#new-song-modal").hidden = true; });
+$("#new-song-empty").addEventListener("click", () => { const name = $("#new-song-name").value.trim(); if (!name) return toast("Escreve o nome da música."); $("#new-song-modal").hidden = true; void createGroupedSong([], name); });
+$("#new-song-import").addEventListener("click", () => { if (!$("#new-song-name").value.trim()) return toast("Escreve o nome da música."); $("#new-song-files").click(); });
+$("#new-song-files").addEventListener("change", (event) => { const files = [...event.target.files], name = $("#new-song-name").value.trim(); event.target.value = ""; if (files.length) { $("#new-song-modal").hidden = true; void createGroupedSong(files, name); } });
 $("#audio-stems-files").addEventListener("change", (event) => {
   const files = [...event.target.files];
   event.target.value = "";
@@ -4313,7 +4492,11 @@ $("#lyrics-stamp-current").addEventListener("click", captureLyricTimestamp);
 $("#lyrics-apply-color").addEventListener("click", applyLyricColorToSelection);
 $("#lyrics-color-picker").addEventListener("input", (event) => { $("#lyrics-color-preview").style.backgroundColor = event.target.value; });
 $("#lyrics-color-picker").addEventListener("change", () => { const textarea = $("#lyrics-editor-text"); if (textarea.selectionStart !== textarea.selectionEnd) applyLyricColorToSelection(); });
-$("#lyrics-editor-text").addEventListener("input", renderLyricsEditorPreview);
+$("#lyrics-editor-text").addEventListener("input", () => {
+  renderLyricsEditorPreview();
+  clearTimeout(lyricsAutoSaveTimer);
+  lyricsAutoSaveTimer = setTimeout(() => { void autoSaveLyricsDraft(); }, 700);
+});
 $("#lyrics-editor-text").addEventListener("scroll", renderLyricsEditorPreview, { passive: true });
 $("#lyrics-create-window-shortcut").addEventListener("click", () => { $("#settings-modal").hidden = false; renderDisplayOutputSettings(); $("#new-display-output-name").focus(); });
 $("#lyrics-output-target").addEventListener("change", (event) => showLyricsEditorOutput(event.target.value));
@@ -4338,6 +4521,8 @@ $("#midi-mixer-modal").addEventListener("click", (event) => { if (event.target =
 $("#close-audio-mixer").addEventListener("click", () => { $("#audio-mixer-modal").hidden = true; });
 $("#audio-mixer-modal").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.hidden = true; });
 $("#pedal-button").addEventListener("click", () => { renderPedalMap(); $("#pedal-modal").hidden = false; });
+$("#midi-assign-song").addEventListener("change", (event) => { const song = state.songs.find((item) => item.id === event.target.value); const mapping = songMidiSelectMapping(song); $("#midi-assign-value").value = mapping ? String(mapping.value) : ""; });
+$("#midi-assign-save").addEventListener("click", () => { const song = state.songs.find((item) => item.id === $("#midi-assign-song").value); if (!song) return toast("Escolhe uma música da setlist."); void saveSongSetlistCcValue(song, $("#midi-assign-value")); });
 $("#song-cc-form").addEventListener("submit", saveSongCcEditor);
 $("#song-cc-type").addEventListener("change", (event) => {
   const type = validSelectTypes.includes(event.target.value) ? event.target.value : "cc";
@@ -4375,12 +4560,12 @@ $("#close-pedals").addEventListener("click", () => { $("#pedal-modal").hidden = 
 $("#pedal-modal").addEventListener("click", (event) => { if (event.target === event.currentTarget) { event.currentTarget.hidden = true; state.learningPedal = -1; state.learningSetlistMidi = false; renderPedalMap(); } });
 $("#connect-pedal").addEventListener("click", connectMidiPedal);
 $("#pedal-device").addEventListener("change", (event) => {
-  const input = [...(state.midiAccess?.inputs.values() ?? [])].find((candidate) => candidate.id === event.target.value) ?? null;
+  const input = allMidiInputs().find((candidate) => candidate.id === event.target.value) ?? null;
   attachPedalInput(input);
 });
 $("#midi-output-device").addEventListener("change", async (event) => {
   const id = event.target.value;
-  const output = id === "internal" ? null : [...(state.midiAccess?.outputs.values() ?? [])].find((candidate) => candidate.id === id) ?? null;
+  const output = id === "internal" ? null : allMidiOutputs().find((candidate) => candidate.id === id) ?? null;
   state.midiOutputId = output?.id ?? "";
   try {
     await midiPlayer.setMidiOutput(output);
@@ -4436,6 +4621,7 @@ function advanceAfterTrack() {
   }
   state.queueDisplayHidden = false;
   $(".setlist-panel").classList.remove("queue-hidden");
+  if (localStorage.getItem("stageset-queue-end-action") === "stop") { updatePlayback(); return; }
   const queueIndex = currentQueueIndex();
   const nextId = queueIndex >= 0 ? state.setlist[queueIndex + 1] : null;
   if (nextId && state.interSongDelay > 0) {
@@ -4452,6 +4638,15 @@ midiPlayer.setVolume(0.8);
 document.addEventListener("keydown", (event) => {
   const target = event.target;
   const isTyping = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable;
+  if (buttonLearnTarget && event.key === "Escape") { buttonLearnTarget = null; $("#learn-modal").hidden = true; toast("Aprendizagem cancelada."); event.preventDefault(); return; }
+  if (buttonLearnTarget && buttonLearnKind === "key" && !event.repeat && !["Shift", "Control", "Alt", "Meta"].includes(event.key)) {
+    assignButtonShortcut("key", { type: "key", code: event.code, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey, meta: event.metaKey });
+    localStorage.setItem("stageset-button-shortcuts", JSON.stringify(buttonShortcuts)); buttonLearnTarget = null; event.preventDefault(); toast("Atalho de teclado guardado."); return;
+  }
+  if (!isTyping && !event.repeat) {
+    const match = Object.entries(buttonShortcuts).map(([id,s])=>[id,s.key||s]).find(([, shortcut]) => shortcut.type === "key" && shortcut.code === event.code && !!shortcut.ctrl === event.ctrlKey && !!shortcut.alt === event.altKey && !!shortcut.shift === event.shiftKey && !!shortcut.meta === event.metaKey);
+    if (match) { const button = shortcutButton(match[0]); if (button && !button.disabled && button.getClientRects().length) { event.preventDefault(); button.click(); return; } }
+  }
   if (state.lyricShortcutLearning && !event.ctrlKey && !event.altKey && !event.metaKey && event.key !== "Escape") {
     event.preventDefault();
     saveLyricShortcut({ type: "key", code: event.code, label: event.key.length === 1 ? event.key.toUpperCase() : event.key });
@@ -4572,5 +4767,25 @@ window.addEventListener("beforeunload", () => {
   if (state.currentId) localStorage.setItem("stageset-current-song", state.currentId);
 });
 
+
+const transferSettingKeys=['stageset-display-outputs','stageset-button-shortcuts','stageset-queue-end-action','stageset-lyric-highlight'];
+syncController=setupSync({getInputs:allMidiInputs,getOutputs:allMidiOutputs,connectMidi:()=>requestMidiAccess({notify:true,sysex:true}),position:currentPosition,playing:isPlaying,seek:seekPlaybackTo,play:async()=>{if(!isPlaying())$('#play').click();},pause:pausePlayback,speed:()=>selectedSong()?.tempo||1,report:toast});
+$('#ip-midi-start').disabled=!window.stageSetDesktop?.startIpMidi;
+if(!window.stageSetDesktop?.startIpMidi)$('#ip-midi-status').textContent='Disponível na aplicação desktop.';
+$('#ip-midi-start').onclick=async()=>{
+  if(!requireStudio())return;
+  $('#ip-midi-start').disabled=true;
+  try{
+    await networkMidi.start({group:$('#ip-midi-group').value.trim(),basePort:Number($('#ip-midi-port').value),interfaceAddress:$('#ip-midi-interface').value.trim()});
+    $('#ip-midi-stop').disabled=false;
+    $('#ip-midi-list').replaceChildren(...[...networkMidi.outputs.values()].map(p=>{const li=document.createElement('li');li.textContent=p.name+' · UDP '+p.port;return li;}));
+  }catch(error){$('#ip-midi-start').disabled=false;toast(error.message);$('#ip-midi-status').textContent=error.message;}
+};
+$('#ip-midi-stop').onclick=async()=>{await networkMidi.stop();$('#ip-midi-start').disabled=false;$('#ip-midi-stop').disabled=true;$('#ip-midi-list').replaceChildren();$('#ip-midi-status').textContent='Desligado';};
 initialize();
 
+
+$('#learn-key').onclick=()=>{buttonLearnKind='key';$('#learn-modal').hidden=true;toast('Prime o atalho de teclado. Escape cancela.');};
+$('#learn-midi').onclick=async()=>{buttonLearnKind='midi';$('#learn-modal').hidden=true;if(!allMidiInputs().length)await requestMidiAccess({notify:true});toast('Envia Note, CC ou Program Change na entrada selecionada em Pedais. Escape cancela.');};
+$('#learn-clear').onclick=()=>{delete buttonShortcuts[buttonLearnTarget];localStorage.setItem('stageset-button-shortcuts',JSON.stringify(buttonShortcuts));buttonLearnTarget=null;$('#learn-modal').hidden=true;toast('Atalhos removidos.');};
+$('#learn-cancel').onclick=()=>{buttonLearnTarget=null;$('#learn-modal').hidden=true;};
