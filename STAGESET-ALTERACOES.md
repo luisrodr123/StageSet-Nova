@@ -32,6 +32,8 @@ Publicação concluída: fontes e tag v0.9.0 nos dois repositórios; instalador,
 
 Ajuste de continuidade após o tag: o ramo main inclui postinstall explícito do Electron oficial para que `npm ci` num PC novo instale também o runtime. O tag inicial requer `node node_modules/electron/install.js` após npm ci. Isto não altera o funcionamento dos executáveis distribuídos. As Releases estão identificadas como pré-lançamento devido aos ensaios físicos pendentes.
 
+Verificação num Windows limpo do GitHub Actions: instalação de dependências, verificação de código, oito testes e testes de interface aprovados. A primeira compilação gerou ambos os EXE mas terminou com erro porque o electron-builder tentou publicar automaticamente. Os comandos de compilação passaram a usar `--publish never`; o workflow guarda os artefactos e a publicação em Releases continua a ser uma operação explícita.
+
 Validação externa pendente: instalação/desinstalação numa conta Windows limpa; dois PCs em multicast; interfaces MIDI/áudio reais e níveis/latência LTC; seleção de vários monitores físicos. A compilação e os testes automáticos não comprovam estes ensaios. Em ecrãs muito pequenos, os painéis podem necessitar de scroll. Código fonte e biblioteca são separados: usar backup de show para transferir músicas entre PCs.
 
 ## 2026-10-27 — distribuição 0.8.0 e desenvolvimento 0.9.0

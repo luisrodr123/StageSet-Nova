@@ -43,6 +43,8 @@ Os dois EXE e SHA256SUMS.txt ficam em dist/. O instalador permite escolher a pas
 
 Em GitHub → Actions → Windows, cada push em main permite descarregar o artefacto Windows após o workflow terminar. Também existe execução manual. As Releases versionadas, quando publicadas, oferecem links diretos para os EXE.
 
+Os comandos de compilação usam `--publish never`: geram ficheiros sem tentar publicar nem exigir um token GitHub. O workflow carrega esses ficheiros como artefactos. Para publicar uma versão aprovada nos dois repositórios, criar/pushar o tag, verificar os EXE e executar `node scripts/release.mjs` com a conta Git autenticada; o script não substitui ficheiros de uma Release que tenham conteúdo diferente.
+
 Para avançar a versão menor, `npm run bump` atualiza package.json, lockfile, interface, cache e acrescenta uma secção por preencher no ficheiro de alterações.
 
 ## Transferir biblioteca e espetáculo
