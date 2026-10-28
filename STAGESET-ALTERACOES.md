@@ -21,7 +21,16 @@ Verificação concluída em perfil isolado:
 - `npm run test:smoke`: criação de música/setlist, login e confirmação de palavra-passe, editor com foco, gravação e reabertura, nomes do mixer, cinco pedais, CC/PC/Note/Song Select e alteração de tamanho no mosaico persistente. Editor verificado a 1273×930, 1024×768 e 800×650. Captura em dist/qa/editor.png.
 - Runtime de desenvolvimento reposto a partir da distribuição oficial Electron 44.7.2. A cópia anterior era um executável StageSet renomeado e não executava os testes; não usar essa cópia para futuras builds.
 
-Distribuição: gerados `StageSet-0.9.0-Setup-x64.exe` e `StageSet-0.9.0-Portable-x64.exe`, com o runtime oficial. Os checksums são produzidos por scripts/checksums.mjs. Repositório público `luisrodr123/StageSet-Nova` e backup privado `luisrodr123/StageSet-0.8` criados; os dois remotes Git estão configurados. Publicação das fontes e dos EXE em curso, com notas de pré-lançamento em docs/RELEASE-0.9.md.
+Distribuição: gerados `StageSet-0.9.0-Setup-x64.exe` e `StageSet-0.9.0-Portable-x64.exe`, com o runtime oficial e metadados Windows 0.9.0.0. Os testes de interface também passaram usando os ficheiros incluídos em `dist/win-unpacked/resources/app.asar`.
+
+Publicação concluída: fontes e tag v0.9.0 nos dois repositórios; instalador, portátil, SHA256SUMS.txt e ficheiro de alterações carregados nas duas Releases:
+
+- Principal público: https://github.com/luisrodr123/StageSet-Nova/releases/tag/v0.9.0
+- Backup privado: https://github.com/luisrodr123/StageSet-0.8/releases/tag/v0.9.0
+- SHA256 portátil: `9dfd7310cd61ce1e8ea3ccc357da563ce211793eb5f65ef44501357bee1528e7`.
+- SHA256 instalador: `c7a4232b6d6f09197e2320a7ba8dbaa37ecf3183d15c18746899dfa2af7ac97b`.
+
+Ajuste de continuidade após o tag: o ramo main inclui postinstall explícito do Electron oficial para que `npm ci` num PC novo instale também o runtime. O tag inicial requer `node node_modules/electron/install.js` após npm ci. Isto não altera o funcionamento dos executáveis distribuídos. As Releases estão identificadas como pré-lançamento devido aos ensaios físicos pendentes.
 
 Validação externa pendente: instalação/desinstalação numa conta Windows limpa; dois PCs em multicast; interfaces MIDI/áudio reais e níveis/latência LTC; seleção de vários monitores físicos. A compilação e os testes automáticos não comprovam estes ensaios. Em ecrãs muito pequenos, os painéis podem necessitar de scroll. Código fonte e biblioteca são separados: usar backup de show para transferir músicas entre PCs.
 

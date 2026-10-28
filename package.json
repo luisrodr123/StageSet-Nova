@@ -6,6 +6,7 @@
   "type": "module",
   "main": "desktop/main.cjs",
   "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
     "start": "node server.mjs",
     "desktop": "electron .",
     "dist:win": "electron-builder --win nsis",

@@ -37,7 +37,7 @@ npm run dist:win:all
 node scripts/checksums.mjs
 ```
 
-O teste de interface cria um perfil temporário e uma janela Electron oculta; não usa dados reais. O teste UDP abre dez sockets locais temporários; um sandbox que bloqueie UDP pode impedir esse teste mesmo que a implementação esteja correta. O runtime Electron tem de ser o oficial instalado por `npm ci`, não um StageSet.exe renomeado. A compilação inicial precisa de Internet para os binários oficiais do Electron/NSIS.
+O teste de interface cria um perfil temporário e uma janela Electron oculta; não usa dados reais. O teste UDP abre dez sockets locais temporários; um sandbox que bloqueie UDP pode impedir esse teste mesmo que a implementação esteja correta. O runtime Electron tem de ser o oficial instalado pelo postinstall deste projeto em `npm ci`, não um StageSet.exe renomeado. A distribuição Electron 44 separa o instalador do pacote npm; se os scripts estiverem desativados ou se usares o tag inicial v0.9.0, executar também `node node_modules/electron/install.js`. A compilação inicial precisa de Internet para os binários oficiais do Electron/NSIS.
 
 Os dois EXE e SHA256SUMS.txt ficam em dist/. O instalador permite escolher a pasta e instala por utilizador. O portátil executa sem instalação. Ambos usam armazenamento do perfil do utilizador: copiar apenas o EXE não transfere a biblioteca. Os binários não têm assinatura digital de um editor.
 
