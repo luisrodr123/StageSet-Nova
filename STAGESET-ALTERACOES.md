@@ -34,6 +34,8 @@ Ajuste de continuidade após o tag: o ramo main inclui postinstall explícito do
 
 Verificação num Windows limpo do GitHub Actions: instalação de dependências, verificação de código, oito testes e testes de interface aprovados. A primeira compilação gerou ambos os EXE mas terminou com erro porque o electron-builder tentou publicar automaticamente. Os comandos de compilação passaram a usar `--publish never`; o workflow guarda os artefactos e a publicação em Releases continua a ser uma operação explícita.
 
+Resultado após a correção: [workflow completo aprovado no repositório principal](https://github.com/luisrodr123/StageSet-Nova/actions/runs/40677472594), incluindo geração dos dois EXE, checksums e carregamento dos artefactos. Commit de código verificado: `e9f0c0a`, sincronizado no backup. O ficheiro de alterações anexo às Releases é atualizado para incluir este registo; os EXE publicados mantêm os checksums acima.
+
 Validação externa pendente: instalação/desinstalação numa conta Windows limpa; dois PCs em multicast; interfaces MIDI/áudio reais e níveis/latência LTC; seleção de vários monitores físicos. A compilação e os testes automáticos não comprovam estes ensaios. Em ecrãs muito pequenos, os painéis podem necessitar de scroll. Código fonte e biblioteca são separados: usar backup de show para transferir músicas entre PCs.
 
 ## 2026-10-27 — distribuição 0.8.0 e desenvolvimento 0.9.0
