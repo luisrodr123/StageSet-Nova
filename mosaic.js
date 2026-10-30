@@ -1,3 +1,4 @@
+import {applyBackground} from './backgrounds.js';
 const tiles=new Map(),checks=new Map();
 const send=data=>opener?.postMessage(data,'*');
 document.querySelector('#show-timestamps').onchange=event=>send({type:'stageset-mosaic-timestamps',value:event.target.checked});
@@ -20,6 +21,7 @@ addEventListener('message',event=>{
     document.querySelector('#grid').append(tile);tiles.set(d.output,tile);
   }
   checks.get(d.output).name.textContent=' '+d.name+' ';tile.querySelector('h2').textContent=d.name;
+  if(d.background)applyBackground(tile.querySelector('.lines'),d.background);
   checks.get(d.output).check.checked=d.visible!==false;tile.hidden=d.visible===false;
   tile.style.borderColor=d.baseColor;
   const size=tile.querySelector('input');if(document.activeElement!==size)size.value=d.fontSize;

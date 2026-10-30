@@ -5,6 +5,8 @@ import { extractMp3CdgPairs, extractAudioStems } from "./zip-import.js";
 import { createBackup, readBackup } from "./backup.js";
 import { NetworkMidi } from './network-midi.js';
 import { setupSync } from './sync.js';
+import { setupSession } from './session-ui.js';
+import { normalizeBackground, applyBackground, setupBackgroundEditor } from './backgrounds.js';
 
 if ("serviceWorker" in navigator && (location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -39,7 +41,7 @@ function loadDisplayOutputs() {
   const fallback = ["Vocalista", "Banda", "Público", "Teleponto"].map((name, index) => ({ id: String(index + 1), name, color: ["#65e2c1", "#79a9ff", "#f0b36c", "#d59aff"][index] }));
   try {
     const saved = JSON.parse(localStorage.getItem("stageset-display-outputs") || "null");
-    if (Array.isArray(saved)) return saved.slice(0, 8).map((item, index) => ({ id: String(item.id || index + 1), name: String(item.name || `Ecrã ${index + 1}`).slice(0, 40), displayId: String(item.displayId || ""), mosaicVisible: item.mosaicVisible !== false, color: /^#[\da-f]{6}$/i.test(item.color) ? item.color : fallback[index % fallback.length].color }));
+    if (Array.isArray(saved)) return saved.slice(0, 8).map((item, index) => ({ id: String(item.id || index + 1), name: String(item.name || `Ecrã ${index + 1}`).slice(0, 40), displayId: String(item.displayId || ""), mosaicVisible: item.mosaicVisible !== false, background:normalizeBackground(item.background), color: /^#[\da-f]{6}$/i.test(item.color) ? item.color : fallback[index % fallback.length].color }));
   } catch {}
   localStorage.setItem("stageset-display-outputs", JSON.stringify(fallback));
   return fallback;
@@ -50,6 +52,10 @@ const $ = (selector) => document.querySelector(selector);
 const audio = $("#audio");
 const midiPlayer = new MidiPlayer();
 let syncController;
+let sessionController;
+let backgroundEditor;
+const sentBackgrounds = new WeakMap();
+function mainBackground() { try{return normalizeBackground(JSON.parse(localStorage.getItem('stageset-main-background')||'{}'));}catch{return normalizeBackground();} }
 const networkMidi = new NetworkMidi((event,id)=>syncController?.receiveMidi(event,id), error=>{
   renderMidiInputs();renderMidiOutputs();syncController?.refreshPorts();
   $("#ip-midi-status").textContent=error||`${networkMidi.outputs.size} portas ligadas · 16 canais em cada porta`;
@@ -1230,7 +1236,15 @@ function broadcastLyricWindows(lines, currentIndex = -1) {
   state.displayOutputs.forEach((output,index) => {
     const prefs = lyricOutputSettings(song,output.id);
     const common = {displays:availableDisplays,desktop:!!window.stageSetDesktop,displayId:output.displayId||'',output:output.id,name:output.name,color:prefs.highlightColor||output.color,baseColor:output.color,fontSize:Number(prefs.fontSize)||42,visible:output.mosaicVisible!==false};
-    const send = (ref,type,withTimes) => { if(!ref||ref.closed)return; const frame=outputLyricFrame(song,output,lines,currentIndex,withTimes);ref.postMessage({type,...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),timestamps},location.origin); };
+    const send = (ref,type,withTimes) => {
+      if(!ref||ref.closed)return;
+      let sent=sentBackgrounds.get(ref);if(!sent){sent=new Map();sentBackgrounds.set(ref,sent);}
+      for(const id of sent.keys())if(!state.displayOutputs.some(item=>item.id===id))sent.delete(id);
+      const changed=!sent.has(output.id)||sent.get(output.id)!==output.background;
+      const frame=outputLyricFrame(song,output,lines,currentIndex,withTimes);
+      ref.postMessage({type,...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),timestamps,...(changed?{background:normalizeBackground(output.background)}:{})},location.origin);
+      sent.set(output.id,output.background);
+    };
     send(state.displayWindows[index],'stageset-lyrics',false);
     send(state.mosaicWindow,'stageset-mosaic',timestamps);
   });
@@ -2007,6 +2021,7 @@ async function setLoopEnabled(enabled) {
 }
 
 function loopAtEnd(song, position, force = false) {
+  if(sessionController?.isSlave())return false;
   if (loopJumping || !song?.loopEnabled || !hasValidLoop(song) || (!force && !isPlaying()) || (!force && position < song.loopOut)) return false;
   loopJumping = true;
   const finish = () => {
@@ -2487,9 +2502,11 @@ function renderDisplayOutputSettings() {
     size.addEventListener("input", () => { const value = Number(size.value); if (!selectedSong() || !Number.isFinite(value) || value < 16 || value > 96) return; void saveLyricOutputSettings(output.id, { fontSize: value }); });
     const remove = document.createElement("button"); remove.type = "button"; remove.className = "backup-button"; remove.textContent = "Remover"; remove.disabled = state.displayOutputs.length <= 1;
     remove.addEventListener("click", () => { state.displayOutputs.splice(index, 1); state.displayWindows.splice(index, 1).forEach((ref) => { try { ref?.close(); } catch {} }); saveDisplayOutputs(); renderDisplayOutputSettings(); refreshMosaic(); void refreshDisplays(); });
-    row.append(name, color, display, size, edit, remove); container.append(row);
+    const background=document.createElement('button');background.type='button';background.className='backup-button';background.textContent='Fundo';background.onclick=()=>backgroundEditor.select(output.id);
+    row.append(name, color, display, size, edit, background, remove); container.append(row);
   });
   $("#create-display-output").disabled = state.displayOutputs.length >= 8;
+  backgroundEditor?.refresh();
 }
 
 let availableDisplays = [];
@@ -2539,7 +2556,7 @@ window.addEventListener('message',event=>{
   const windowIndex=state.displayWindows.findIndex(ref=>ref===event.source);
   if(!mosaic && windowIndex<0)return;
   const d=event.data;
-  if(d?.type==='stageset-mosaic-ready'||d?.type==='stageset-output-ready'){void refreshDisplays().then(refreshMosaic);return;}
+  if(d?.type==='stageset-mosaic-ready'||d?.type==='stageset-output-ready'){sentBackgrounds.delete(event.source);void refreshDisplays().then(refreshMosaic);return;}
   if(d?.type==='stageset-mosaic-timestamps' && mosaic){localStorage.setItem('stageset-mosaic-timestamps',String(!!d.value));refreshMosaic();return;}
   if(!['stageset-mosaic-setting','stageset-output-setting'].includes(d?.type))return;
   const output=state.displayOutputs.find(o=>o.id===d.output);if(!output || (!mosaic && state.displayOutputs[windowIndex]!==output))return;
@@ -3943,7 +3960,7 @@ async function restoreBackupFile(file) {
     audio.pause();
     midiPlayer.pause();
     for(const key of transferSettingKeys){const value=backup.interfaceSettings?.[key];if(typeof value==='string')localStorage.setItem(key,value);}
-    state.displayOutputs=loadDisplayOutputs();saveDisplayOutputs();
+    state.displayOutputs=loadDisplayOutputs();saveDisplayOutputs();backgroundEditor.refresh();applyBackground($('#lyrics-stage'),mainBackground());
     try{buttonShortcuts=JSON.parse(localStorage.getItem("stageset-button-shortcuts")||"{}");}catch{buttonShortcuts={};}
     state.songs = backup.songs;
     state.setlist = backup.setlist;
@@ -4587,6 +4604,7 @@ midiPlayer.onEnded = () => {
 };
 
 function advanceAfterTrack() {
+  if (sessionController?.isSlave()) { pausePlayback(); return; }
   fireEmbeddedMidiActions("stop");
   if (state.quickiePlaying) {
     state.quickiePlaying = false;
@@ -4745,8 +4763,44 @@ window.addEventListener("beforeunload", () => {
 });
 
 
-const transferSettingKeys=['stageset-display-outputs','stageset-button-shortcuts','stageset-queue-end-action','stageset-lyric-highlight','stageset-mosaic-timestamps','stageset-main-display','stageset-mosaic-display'];
+const transferSettingKeys=['stageset-display-outputs','stageset-main-background','stageset-button-shortcuts','stageset-queue-end-action','stageset-lyric-highlight','stageset-mosaic-timestamps','stageset-main-display','stageset-mosaic-display'];
+backgroundEditor=setupBackgroundEditor({
+  outputs:()=>[{id:'main',name:'Palco principal'},...state.displayOutputs],
+  get:id=>id==='main'?mainBackground():normalizeBackground(state.displayOutputs.find(o=>o.id===id)?.background),
+  set:(id,value)=>{
+    if(id==='main'){localStorage.setItem('stageset-main-background',JSON.stringify(value));applyBackground($('#lyrics-stage'),value);}
+    else {
+      const output=state.displayOutputs.find(o=>o.id===id);if(!output)throw Error('Esta saída foi removida.');
+      const previous=output.background;output.background=value;
+      try{saveDisplayOutputs();}catch(error){output.background=previous;throw error;}
+      refreshMosaic();
+    }
+  },report:toast,
+});
+applyBackground($('#lyrics-stage'),mainBackground());
 syncController=setupSync({getInputs:allMidiInputs,getOutputs:allMidiOutputs,connectMidi:()=>requestMidiAccess({notify:true,sysex:true}),position:currentPosition,playing:isPlaying,seek:seekPlaybackTo,play:async()=>{if(!isPlaying())$('#play').click();},pause:pausePlayback,speed:()=>selectedSong()?.tempo||1,report:toast});
+sessionController=setupSession({
+  readState:()=>{const song=selectedSong();return {song:song?{id:song.id,title:String(song.title||'').slice(0,180),fileName:String(song.fileName||'').slice(0,180)}:null,playing:isPlaying(),position:currentPosition(),rate:song?.tempo||1};},
+  pause:()=>{if(queueDelayTimer)clearTimeout(queueDelayTimer);queueDelayTimer=null;pausePlayback();},stopTimecode:()=>syncController.stop(),report:toast,
+  applyState:async(value,valid)=>{
+    if(!value.song){pausePlayback();return;}
+    const byId=state.songs.find(song=>song.id===value.song.id);
+    const matches=state.songs.filter(song=>song.title===value.song.title&&song.fileName===value.song.fileName);
+    const song=byId||(matches.length===1?matches[0]:null);
+    if(!song||isDocumentSong(song))throw Error('Música ausente ou ambígua: '+value.song.title);
+    if(state.currentId!==song.id){pausePlayback();await selectSong(song.id);}
+    if(!valid())return;
+    if(song.tempo!==value.rate){song.tempo=value.rate;audio.playbackRate=value.rate;stemPlayers.forEach(p=>p.audio.playbackRate=value.rate);if(midiData)await midiPlayer.setRate(value.rate);$('#tempo-value').textContent=Math.round(value.rate*100)+'%';}
+    if(!valid())return;
+    if(Math.abs(currentPosition()-value.position)>.2||!value.playing)seekPlaybackTo(value.position);
+    if(!value.playing)pausePlayback();
+    else if(!isPlaying()){
+      if(isMidiSong(song))await midiPlayer.play();
+      else {await audio.play();if(hasMidiLayer(song)&&midiData)await midiPlayer.play();}
+      if(!valid())pausePlayback();
+    }
+  }
+});
 $('#ip-midi-start').disabled=!window.stageSetDesktop?.startIpMidi;
 if(!window.stageSetDesktop?.startIpMidi)$('#ip-midi-status').textContent='Disponível na aplicação desktop.';
 $('#ip-midi-start').onclick=async()=>{

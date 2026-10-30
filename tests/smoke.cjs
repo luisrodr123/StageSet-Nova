@@ -15,7 +15,7 @@ async function run(){
   const {createStageSetServer}=await import(pathToFileURL(path.join(testRoot,'server.mjs')).href);
   server=createStageSetServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   win=new BrowserWindow({show:false,width:1273,height:930,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});
-  win.webContents.setWindowOpenHandler(()=>({action:'allow',overrideBrowserWindowOptions:{show:false,width:1100,height:700}}));
+  win.webContents.setWindowOpenHandler(()=>({action:'allow',overrideBrowserWindowOptions:{show:false,width:1100,height:700,webPreferences:{backgroundThrottling:false}}}));
   win.webContents.on('did-create-window',child=>children.push(child));
   win.webContents.on('console-message',event=>{if(event.level==='error'&&!/permission|MIDI|device|media|404/i.test(event.message))errors.push(event.message);});
   const url=`http://127.0.0.1:${server.address().port}/`;
@@ -86,10 +86,14 @@ async function run(){
   await evaluate(`check((await getSongs())[0].lyricOutputSettings['1'].fontSize===57,'Mosaic size not saved');check(!testErrors.length,testErrors.join('\\n'));`);
   console.log('Editable mixer names, 5 pedals, CC/PC/Note/Song mapping and mosaic controls: OK');
   await require('./annotations.cjs')({win,mosaic,evaluate,children});
+  await require('./backgrounds-ui.cjs')({win,mosaic,evaluate,children});
+  await require('./session-ui.cjs')({url,children});
   const reloaded=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.reload();await reloaded;
   await evaluate(`for(let i=0;i<100&&!document.querySelector('.library-song');i++)await new Promise(resolve=>setTimeout(resolve,30));`);
   const saved=await win.webContents.executeJavaScript(`({songs:document.querySelectorAll('.library-song').length,version:document.querySelector('.app-version').textContent,studio:document.body.classList.contains('live-mode')})`);
   if(saved.songs!==2||saved.version!==expectedVersion||!saved.studio)throw new Error('Reload persistence failed '+JSON.stringify(saved));
+  const backgroundSaved=await win.webContents.executeJavaScript(`document.getElementById('lyrics-stage').style.backgroundColor==='rgb(39, 52, 73)' && JSON.parse(localStorage.getItem('stageset-display-outputs')).find(o=>o.id==='2').background.type==='image'`);
+  if(!backgroundSaved)throw Error('Background reload persistence failed');
   if(errors.length)throw new Error(errors.join('\n'));
   console.log('Editor layout, save, Learn, password confirmation and reload persistence: OK');
 }

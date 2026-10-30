@@ -5,6 +5,8 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const { IpMidi } = require('./ip-midi.cjs');
 const ipMidi = new IpMidi();
+const { SessionNetwork } = require('./session-link.cjs');
+const sessionLink = new SessionNetwork();
 
 const desktopPort = 4178;
 const localUrl = `http://127.0.0.1:${desktopPort}`;
@@ -20,6 +22,17 @@ if (!hasSingleInstance) {
   app.quit();
 } else {
   const trusted = event => event.sender === mainWindow?.webContents && new URL(event.sender.getURL()).origin === localUrl;
+  ipcMain.handle('background:eps', (event, data) => { if(!trusted(event))throw Error('Janela não autorizada.');return require('./background-image.cjs').convertEps(data); });
+  const sessionHandlers = {
+    info: () => ({name:require('node:os').hostname(),version:app.getVersion()}),
+    start: config => sessionLink.start({...config,version:app.getVersion()}),
+    stop: () => sessionLink.stop(),
+    choose: (id,selected) => sessionLink.choose(id,!!selected),
+    state: value => sessionLink.setState(value),
+    feedback: message => sessionLink.feedback(message),
+  };
+  for(const [name,handler] of Object.entries(sessionHandlers))ipcMain.handle(`session:${name}`,(event,...args)=>{if(!trusted(event))throw Error('Janela não autorizada.');return handler(...args);});
+  for(const name of ['status','control','lost','failure'])sessionLink.on(name,data=>{if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send(`session:${name}`,data);});
   for (const [name, handler] of Object.entries({start: config => ipMidi.start(config), stop: () => ipMidi.stop(), send: (id,data,delay) => ipMidi.send(id,data,delay), clear: id => ipMidi.clear(id)})) {
     ipcMain.handle(`ipmidi:${name}`, (event,...args) => { if(!trusted(event))throw new Error('Janela não autorizada.');return handler(...args); });
   }
@@ -110,6 +123,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
     },
   });
   mainWindow.webContents.setWindowOpenHandler(({ frameName }) => frameName?.startsWith("stageset-lyrics-")
@@ -126,6 +140,7 @@ function createWindow() {
 }
 
 app.on("before-quit", () => {
+  sessionLink.stop();
   ipMidi.stop();
   if (server?.listening) server.close();
 });

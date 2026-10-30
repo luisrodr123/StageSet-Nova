@@ -1,9 +1,11 @@
-# Estado das anotações — StageSet 0.10.0
+# Estado das anotações — StageSet 0.11.0
 
 Este registo consolida os pedidos recebidos nesta conversa. O código das funções abaixo existe; a coluna de verificação distingue testes automáticos de ensaios físicos ainda necessários.
 
 | Pedido | Implementação / verificação |
 | --- | --- |
+| Fundo independente por monitor de letras | Cor sólida ou imagem, preencher/inteira/repetir e escurecimento. Janelas, mosaico, reabertura e backup testados. EPS convertido por Ghostscript externo no desktop. |
+| Detetar computadores StageSet e selecionar Slaves | Canal de controlo UDP multicast autenticado, seleção explícita e pausa por perda de sinal. Dois pares locais e interface testados; ensaio em dois PCs físicos pendente. Não é descoberta MIDI convencional. |
 | Entrar no Studio apenas com palavra-passe | Confirmada no teste de interface; confirmação apenas na criação. |
 | Gerar e ler SMPTE/LTC e MTC | Codecs e PCM verificados automaticamente; interfaces e latência exigem ensaio físico. |
 | Criar dez portas IP MIDI com dezasseis canais | UDP multicast implementado no desktop, teste real de dez sockets e dezasseis canais. Não instala driver virtual Windows nem implementa RTP-MIDI. Dois PCs por validar. |

@@ -165,3 +165,8 @@
 @media(max-width:650px){.workspace{grid-template-columns:minmax(0,1fr);min-height:auto}.workspace-resizer,.workspace-resize-corner{display:none}.stage-functions[open] .stage-tools{right:0}.topbar-menu-items{right:-75px}.display-output-row{display:grid;grid-template-columns:minmax(120px,1fr) 42px auto}.display-output-create label:first-child{flex:1 1 100%}}
 @media(max-width:760px){body{min-width:360px}.workspace{grid-template-columns:minmax(0,1fr);min-height:auto}.workspace-resizer,.workspace-resize-corner{display:none}.stage{grid-row:1}.sidebar{grid-row:2}}
 .help-modal{resize:both;overflow:auto;min-width:min(340px,calc(100vw - 24px))}
+/* Independent lyric wallpapers; controls remain outside the background. */
+.lyrics-stage.custom-lyric-background::before,.lyrics-stage.custom-lyric-background::after{display:none}
+#background-preview{min-height:150px;border:1px solid #35404b;border-radius:8px;margin:12px 0;padding:28px;display:grid;place-items:center;text-align:center;color:white;font-size:24px;text-shadow:0 1px 4px #000}
+#background-settings input[type=file]{max-width:72%;font-size:11px}#background-settings [hidden]{display:none!important}
+#session-options{border:0;padding:0;min-width:0}#session-peers{padding-left:0;list-style:none;font-size:12px}#session-peers li{margin:8px 0}#session-peers label{display:flex;gap:6px;align-items:center}#session-options input{max-width:210px;background:#171e26;color:#d6dde2;border:1px solid #35404b;border-radius:5px;padding:7px}

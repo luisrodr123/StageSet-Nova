@@ -36,7 +36,7 @@
           <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <span class="app-version" aria-label="Versão da aplicação">v0.10</span>
+          <span class="app-version" aria-label="Versão da aplicação">v0.11</span>
         </div>
       </header>
 
@@ -418,6 +418,22 @@
             <button class="backup-button" id="ip-midi-start" type="button">Ligar 10 portas</button> <button class="backup-button" id="ip-midi-stop" type="button" disabled>Desligar portas</button>
             <p id="ip-midi-status" role="status">Desligado</p><ul id="ip-midi-list"></ul>
           </section>
+          <section class="settings-group">
+            <h3>Computadores StageSet · Master / Slave</h3>
+            <p>Ativa a sessão nos computadores que queres ligar, com o mesmo código. No Master, seleciona os Slaves. A descoberta usa UDP na rede local junto do IP MIDI; os ficheiros das músicas devem existir em cada computador.</p>
+            <fieldset id="session-options">
+              <label class="settings-field">Nome deste computador<input id="session-name" maxlength="60" /></label>
+              <label class="settings-field">Modo<select id="session-role"><option value="master">Master · controlar outros computadores</option><option value="slave">Slave · aceitar um Master desta sessão</option></select></label>
+              <label class="settings-field">Código de sessão<input id="session-code" type="password" minlength="6" maxlength="64" autocomplete="off" placeholder="Igual nos computadores · mínimo 6 caracteres" /></label>
+              <label class="settings-field">Grupo de descoberta<input id="session-group" value="225.0.0.37" /></label>
+              <label class="settings-field">Porta UDP de descoberta<input id="session-port" type="number" min="1024" max="65535" value="21938" /></label>
+              <label class="settings-field">IP da interface local (opcional)<input id="session-interface" placeholder="Automática" /></label>
+            </fieldset>
+            <button class="connect-button" id="session-start" type="button">Ativar e procurar computadores</button>
+            <button class="backup-button" id="session-stop" type="button" disabled>Desligar / libertar Slave</button>
+            <p id="session-status" role="status">Desligado</p><ul id="session-peers"></ul>
+            <p>O Slave segue música, andamento, reprodução, pausa e posição; pára se perder o Master. Usa o backup de show para levar a mesma biblioteca a cada PC. MIDI convencional: configura a entrada/saída MTC abaixo; não identifica automaticamente computadores.</p>
+          </section>
           <section class="settings-group"><h3>Sincronização SMPTE / MTC</h3>
             <fieldset id="sync-options"><label class="settings-field">Modo<select id="sync-mode"><option value="mtc-write">Emitir MTC</option><option value="mtc-read">Ler MTC</option><option value="ltc-write">Emitir SMPTE / LTC áudio</option><option value="ltc-read">Ler SMPTE / LTC áudio</option></select></label>
             <label class="settings-field">Fotogramas por segundo<select id="sync-rate"><option value="0">24 fps</option><option value="1" selected>25 fps</option><option value="2">29,97 drop-frame</option><option value="3">30 fps</option></select></label>
@@ -434,6 +450,23 @@
           </section>
           <section class="settings-group"><h3>Áudio, vídeo e MIDI</h3><p>Ao iniciar, o StageSet pede autorização para detetar interfaces de entrada. Os streams temporários são fechados logo após a deteção. As saídas áudio são configuradas no Mixer áudio e as portas MIDI no menu Pedais.</p><p id="device-access-status" role="status">A detetar interfaces…</p><label class="settings-field">Entrada áudio<select id="audio-input-device"><option value="">Nenhuma entrada listada</option></select></label><label class="settings-field">Câmara / entrada vídeo<select id="video-input-device"><option value="">Nenhuma entrada listada</option></select></label><div class="settings-actions"><button class="backup-button" id="refresh-audio-inputs" type="button">Pedir autorização e procurar</button><button class="backup-button" id="settings-audio" type="button">Configurar saídas áudio</button><button class="backup-button" id="settings-midi" type="button">Configurar portas MIDI</button></div></section>
           <section class="settings-group"><h3>Saída de letras</h3><label class="settings-field">Ecrã principal <select id="main-display-select"><option value="">Ecrã atual</option></select></label><label class="settings-field">Ecrã do mosaico <select id="mosaic-display-select"><option value="">Ecrã atual</option></select></label><p id="display-selection-status"></p><label class="settings-field">Cor de destaque da frase atual <input id="settings-lyric-highlight" type="color" value="#65e2c1" /></label><div id="display-output-list" class="display-output-list"></div><div class="display-output-create"><label>Nome da nova janela <input id="new-display-output-name" maxlength="40" placeholder="Ex.: Vocalista" /></label><label>Cor <input id="new-display-output-color" type="color" value="#65e2c1" /></label><button class="backup-button" id="create-display-output" type="button">＋ Criar janela</button></div><button class="connect-button" id="open-display-windows" type="button">Abrir janelas de letras</button><button class="backup-button" id="open-lyrics-mosaic-settings" type="button">Abrir mosaico de janelas</button></section>
+          <section class="settings-group" id="background-settings">
+            <h3>Fundo das letras · por saída</h3>
+            <p>Escolhe um fundo para cada monitor. A alteração aparece nas janelas abertas e no mosaico e fica guardada para todas as músicas.</p>
+            <label class="settings-field">Janela <select id="background-output"></select></label>
+            <label class="settings-field">Fundo <select id="background-type"><option value="solid">Cor sólida</option><option value="image">Imagem / wallpaper</option></select></label>
+            <label class="settings-field">Cor de fundo <input id="background-color" type="color" value="#10141b"></label>
+            <div id="background-image-options" hidden>
+              <label class="settings-field">Imagem <input id="background-file" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.eps,image/*"></label>
+              <p id="background-file-name"></p>
+              <label class="settings-field">Apresentação <select id="background-fit"><option value="cover">Preencher</option><option value="contain">Imagem inteira</option><option value="repeat">Repetir padrão</option></select></label>
+              <label class="settings-field">Escurecer para ler melhor <input id="background-dim" type="range" min="0" max="80" step="5" value="0"></label>
+              <button class="backup-button" id="background-remove" type="button">Remover imagem</button>
+            </div>
+            <div id="background-preview" aria-label="Pré-visualização do fundo">Palco principal</div>
+            <p id="background-status" role="status"></p>
+            <p>JPG, PNG, WebP, GIF (imagem fixa), BMP e SVG. EPS na aplicação desktop com Ghostscript instalado. A imagem é otimizada e incluída no backup do show.</p>
+          </section>
           <section class="settings-group"><h3>Separação de stems</h3><label class="settings-field">Fonte local<select id="stem-provider"><option value="stemdeck">StemDeck · serviço local</option><option value="zip">Importar ZIP de qualquer separador</option></select></label><p>O StemDeck processa no computador. A opção ZIP aceita stems criados noutra aplicação.</p></section>
           <section class="settings-group"><h3>Palavra-passe do Studio</h3><label class="settings-field">Palavra-passe atual <input id="studio-password-current" type="password" autocomplete="current-password" /></label><label class="settings-field">Nova palavra-passe <input id="studio-password-new" type="password" minlength="6" autocomplete="new-password" /></label><label class="settings-field">Confirmar nova palavra-passe <input id="studio-password-new-confirm" type="password" minlength="6" autocomplete="new-password" /></label><button class="backup-button" id="save-studio-password" type="button">Guardar palavra-passe</button></section>
         </section>

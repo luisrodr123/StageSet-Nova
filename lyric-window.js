@@ -1,3 +1,4 @@
+import {applyBackground} from './backgrounds.js';
 const output = new URLSearchParams(location.search).get('output');
 const send = data => opener?.postMessage({ ...data, output }, location.origin);
 const size = document.querySelector('#size'), display = document.querySelector('#display');
@@ -6,6 +7,7 @@ display.onchange = () => send({ type: 'stageset-output-setting', displayId: disp
 addEventListener('message', event => {
   if (event.source !== opener || event.origin !== location.origin || event.data?.type !== 'stageset-lyrics' || event.data.output !== output) return;
   const d = event.data;
+  if(d.background)applyBackground(document.querySelector('#stage'),d.background);
   document.title = 'StageSet · ' + d.name;
   document.querySelector('#name').textContent = d.name;
   if (document.activeElement !== size) size.value = d.fontSize;

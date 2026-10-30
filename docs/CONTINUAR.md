@@ -76,3 +76,26 @@ MTC gera quarter frames e full frames, incluindo 29,97 DF. LTC em áudio gera e 
 Falta validação física: 2 PCs multicast, todas as interfaces reais, full-frame SysEx, cabos LTC áudio com ruído, compensação de latência, vários monitores, teste de portátil numa conta limpa. O workflow executa instalação, arranque e desinstalação num Windows descartável; ver o resultado da execução da versão. Os testes automatizados não substituem esses ensaios.
 
 Referências de protocolo consultadas (implementação própria): [MIDI Association — Time Code](https://midi.org/midi-time-code), [libltc — documentação do formato LTC](https://github.com/x42/libltc/blob/master/src/ltc.h), [ipMIDI FAQ — multicast](https://www.nerds.de/en/ipmidi_faq.html), [Arduino-ipMIDI — portas UDP](https://github.com/lathoub/Arduino-ipMIDI).
+
+## Fundos por monitor de letras
+
+Em Configurações → Fundo das letras, escolher Palco principal, Vocalista, Banda, Público ou outra saída criada. Escolher cor sólida ou imagem e o modo Preencher / Imagem inteira / Repetir padrão. A barra Escurecer ajuda a manter o texto legível. O botão Fundo de cada saída abre diretamente a configuração dessa janela. O fundo é global para essa saída, independentemente da música; o tamanho das letras continua guardado por música/saída.
+
+Importar JPG, PNG, WebP, GIF (um fotograma), BMP ou SVG. A aplicação guarda uma cópia raster otimizada, sem ligação ao caminho original; o backup de show inclui essa imagem. Cada saída pode ter uma imagem diferente. Imagens até 16 MB, raster máximo de 64 megapíxeis, otimizado até 180 000 caracteres por saída para caber nas preferências locais. Um erro de armazenamento não confirma a gravação.
+
+EPS: apenas na aplicação desktop e com Ghostscript para Windows instalado em Program Files/gs. Não é incluído no instalador/portátil. A conversão usa uma pasta temporária própria, processo sem janela/shell, limite de 15 segundos e raster de 1600×1200. Usar uma versão atual do Ghostscript. [Opções oficiais de conversão EPS](https://ghostscript.readthedocs.io/en/master/Use.html#eps-parameters). Depois de importar, o fundo guardado e o backup funcionam em PCs sem Ghostscript.
+
+Código: backgrounds.js (normalização, importação, interface), desktop/background-image.cjs (EPS), app.js (persistência/backup/envio), lyric-window.js e mosaic.js (apresentação). CD+G/PDF possuem conteúdo visual próprio e podem cobrir o wallpaper.
+
+## Computadores Master / Slave
+
+1. Instalar StageSet 0.11 ou posterior nos computadores da mesma rede local. Levar as músicas pelo backup completo do show para conservar os IDs. Sem backup comum, o título e nome de ficheiro têm de ser iguais e únicos.
+2. Nos PCs a controlar: Configurações → Computadores StageSet → modo Slave, nome e código de sessão com pelo menos seis caracteres → Ativar. O código é necessário novamente após fechar a aplicação.
+3. No PC de comando: escolher Master com o mesmo código/grupo/porta → Ativar. Selecionar na lista os Slaves que devem seguir a reprodução. Desmarcar liberta e pausa esse Slave; Desligar termina a sessão.
+4. Os Slaves seguem a faixa, reproduzir/pausar, posição e velocidade. Mantêm as suas saídas áudio/MIDI, letras e fundos locais. Sem a faixa correspondente, pausam e mostram a causa na lista do Master.
+
+A descoberta é um protocolo StageSet sobre UDP multicast (225.0.0.37:21938), separado das dez portas IP MIDI (21928–21937). Não confundir com enumeração de hardware MIDI, RTP-MIDI ou AppleMIDI. Uma ligação MIDI normal continua a poder transportar MTC, mas não descobre automaticamente nomes de computadores. Evitar usar uma porta de controlo já atribuída a IP MIDI. Em redes com várias placas, indicar o IPv4 da placa na opção Interface em cada PC. A firewall deve permitir o StageSet na rede privada e o router/Wi-Fi deve permitir multicast entre clientes; TTL 1, não atravessa sub-redes por defeito.
+
+Até 32 computadores visíveis e 16 Slaves selecionados. Ativação por sessão; não aceita controlo quando desligado ou em Master. HMAC-SHA256 autentica o código partilhado, mas não cifra mensagens; usar numa LAN de confiança e código não trivial. Não há transferência de músicas. Estado a 10 Hz, correção de desvio acima de 200 ms; não serve de genlock nem alinhamento áudio à amostra. Perda de controlo por 2,5 segundos pausa; se o renderer Master deixa de publicar por 1 segundo, liberta Slaves. Desligar a sessão permite voltar a ativar SMPTE/MTC.
+
+Código: desktop/session-link.cjs (máquina de estados e sockets), session-ui.js (configuração/lista), app.js (transporte) e IPC em desktop/main.cjs/preload.cjs. Testes de multicast real entre duas instâncias no mesmo PC; tests/session-ui.cjs usa ponte simulada num perfil temporário para testar o transporte real da aplicação. Falta ensaio físico em dois PCs, interfaces e rede do espetáculo.

@@ -1,5 +1,21 @@
 # StageSet — alterações anotadas
 
+## 2026-10-30 — versão 0.11.0
+
+- Fundos independentes para palco principal e cada saída de letras: cor sólida ou wallpaper, preencher/imagem inteira/repetir padrão, escurecimento e pré-visualização. Botão Fundo junto de cada saída nas Configurações.
+- JPG, PNG, WebP, GIF (imagem fixa), BMP e SVG importados como imagem raster otimizada (até 180 000 caracteres por saída). EPS convertido no desktop com Ghostscript instalado separadamente; não é incluído nos EXE. Originais até 16 MB. O ficheiro original pode ser movido depois da importação.
+- Fundos atualizados em tempo real nas janelas abertas e no mosaico, persistidos por saída para todas as músicas e incluídos no backup do show. Imagens só são reenviadas às janelas quando mudam, sem repetir dados em cada atualização de letras. Erros de ficheiro ou armazenamento preservam o fundo anterior.
+- Descoberta de computadores StageSet desktop na LAN e seleção de até 16 Slaves pelo Master. Ativação explícita em cada PC com o mesmo código de sessão, nome, grupo multicast e porta configuráveis.
+- Canal StageSet UDP multicast separado das dez portas IP MIDI: grupo 225.0.0.37, porta 21938 por defeito. Mensagens autenticadas com HMAC-SHA256, sequências e sessão renovada por arranque. Código não gravado em disco nem exportado. Os dados não são cifrados.
+- Slaves selecionados seguem música, reproduzir/pausar, posição e velocidade. A biblioteca fica local; identificar por ID de um backup comum ou título/nome de ficheiro exatos e únicos. Música ausente/ambígua pausa e informa o Master.
+- Libertação, perda de sinal (2,5 s) ou estado de reprodução congelado no Master interrompem o seguimento. Loops e avanço automático locais não competem com o Master. Sincronização SMPTE/MTC é parada ao ativar a sessão; pode ser retomada ao desligá-la. Temporizadores desktop mantidos ativos com janela minimizada.
+- Versão, cache, documentação, lista de anotações e ambos os formatos de distribuição preparados para 0.11.0.
+
+Validação local: 14 testes de protocolo/backup aprovados, incluindo dois pares multicast reais no mesmo PC, isolamento de Slaves, autenticação/repetição/perda de sinal e conversão EPS real. Testes Electron com perfil temporário aprovados: fundos diferentes por saída, mudança ao vivo, exportação e reabertura; ponte nativa simulada com seleção de música, seek/play, pausa por perda e publicação Master. Sintaxe, IDs HTML e versões aprovados. Capturas verificadas: wallpaper quadriculado e cor sólida em saídas diferentes. Instalador e portátil 0.11.0 gerados por scripts versionados; o ficheiro SHA256SUMS.txt acompanha a distribuição.
+
+Limites: ensaio com dois PCs físicos, firewalls/redes e vários monitores ainda necessário. Descoberta através do canal StageSet na rede local, não através de MIDI convencional nem RTP-MIDI/AppleMIDI. Não transmite ficheiros áudio, não cifra o tráfego e não garante sincronismo à amostra; correção de posição acima de 200 ms. EPS requer Ghostscript e é rasterizado numa área de 1600×1200. CD+G e documentos PDF mantêm a sua própria imagem sobre o fundo.
+
+
 ## 2026-10-30 — versão 0.10.0
 
 - Corrigida a perda do rascunho do palco principal quando se guardava noutra saída; gravação e autosave conservam todas as saídas editadas e o BPM. Fechar o editor guarda o rascunho pendente.
