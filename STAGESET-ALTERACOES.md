@@ -13,6 +13,12 @@
 
 Validação local: 14 testes de protocolo/backup aprovados, incluindo dois pares multicast reais no mesmo PC, isolamento de Slaves, autenticação/repetição/perda de sinal e conversão EPS real. Testes Electron com perfil temporário aprovados: fundos diferentes por saída, mudança ao vivo, exportação e reabertura; ponte nativa simulada com seleção de música, seek/play, pausa por perda e publicação Master. Sintaxe, IDs HTML e versões aprovados. Capturas verificadas: wallpaper quadriculado e cor sólida em saídas diferentes. Instalador e portátil 0.11.0 gerados por scripts versionados; o ficheiro SHA256SUMS.txt acompanha a distribuição.
 
+Distribuição local concluída e testada a partir de dist/win-unpacked/resources/app.asar (código 7f9cb33). Os mesmos testes Electron passaram no pacote distribuído.
+
+- StageSet-0.11.0-Portable-x64.exe — SHA256: c49c136d1745a210c2a185d3686d24590c656479850d2b5326e24b7c7c906ab4.
+- StageSet-0.11.0-Setup-x64.exe — SHA256: 6703ca066f373891a920e537aff1687f78239da20a94e8659bdda04ad5e29175.
+- Verificação Windows isolada submetida: https://github.com/luisrodr123/StageSet-Nova/actions/runs/41111149738. O resultado remoto ainda não estava disponível no momento da geração local.
+
 Limites: ensaio com dois PCs físicos, firewalls/redes e vários monitores ainda necessário. Descoberta através do canal StageSet na rede local, não através de MIDI convencional nem RTP-MIDI/AppleMIDI. Não transmite ficheiros áudio, não cifra o tráfego e não garante sincronismo à amostra; correção de posição acima de 200 ms. EPS requer Ghostscript e é rasterizado numa área de 1600×1200. CD+G e documentos PDF mantêm a sua própria imagem sobre o fundo.
 
 
