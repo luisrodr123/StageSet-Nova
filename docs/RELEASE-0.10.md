@@ -9,7 +9,7 @@ Instalador e executável portátil, sem assinatura digital. Esta versão conclui
 - Música criada só com MIDI/KAR usa o ficheiro original; ZIP de stems é expandido antes de escolher a faixa principal.
 - Preferências de ecrãs e timestamps incluídas no backup do show.
 
-Testes de protocolo/backup e testes de interface aprovados, incluindo as regressões acima. O workflow também verifica instalação, arranque e desinstalação num Windows isolado.
+Testes de protocolo/backup e testes de interface aprovados, incluindo as regressões acima. Instalação, arranque e desinstalação também aprovados num Windows isolado: [verificação GitHub](https://github.com/luisrodr123/StageSet-Nova/actions/runs/41097267196).
 
 Mantém MTC, SMPTE/LTC e dez portas IP MIDI da versão 0.9. A validação física de interfaces, vários monitores e dois computadores continua necessária; distribuição identificada como pré-lançamento. IP MIDI é UDP multicast, sem driver virtual Windows nem RTP-MIDI/AppleMIDI. Consultar docs/ANOTACOES.md e docs/CONTINUAR.md.
 

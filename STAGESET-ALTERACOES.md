@@ -10,7 +10,7 @@
 - Preferências de monitores e timestamps incluídas no backup; ecrãs restaurados no arranque desktop.
 - Consolidado o estado de todos os pedidos em docs/ANOTACOES.md. Versão, lockfile, interface, README e cache atualizados.
 - Validação local aprovada: verificação de sintaxe/IDs/versões, oito testes de protocolos/backup e testes Electron ampliados para rascunhos entre saídas, importação/exportação, controlos das janelas, remoção, mosaico e nova música MIDI. Perfil temporário; biblioteca do utilizador preservada.
-- Workflow acrescenta instalação, arranque e desinstalação num Windows descartável. Resultado de distribuição registado na Release e na execução correspondente do GitHub.
+- Instalação, arranque e desinstalação aprovados num Windows descartável do GitHub, juntamente com testes, compilação e carregamento dos artefactos: https://github.com/luisrodr123/StageSet-Nova/actions/runs/41097267196. Código verificado: 26c7c32.
 
 Distribuição local gerada: StageSet-0.10.0-Setup-x64.exe e StageSet-0.10.0-Portable-x64.exe. Os testes Electron também passaram usando os ficheiros dentro do app.asar distribuído. Capturas das novas janelas em dist/qa.
 
