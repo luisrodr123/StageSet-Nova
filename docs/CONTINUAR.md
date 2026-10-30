@@ -63,7 +63,7 @@ No PC/origem original, entrar no Studio e guardar o show completo pelo menu da a
 | timecode.js / ltc-worklet.js / sync.js | SMPTE, codec LTC, MTC e controlos de sincronização |
 | desktop/ip-midi.cjs / network-midi.js | Dez portas UDP multicast e adaptação à interface MIDI |
 | desktop/main.cjs / preload.cjs | Electron, IPC, ecrãs, MIDI por rede, StemDeck |
-| mosaic.html / mosaic.js | Mosaico e controlos por saída |
+| mosaic.html / mosaic.js / lyric-window.html / lyric-window.js | Mosaico, janelas e controlos por saída |
 | server.mjs / sw.js | Servidor localhost e cache offline |
 | tests/ | Protocolos, backup e integração Electron com perfil isolado |
 
@@ -73,6 +73,6 @@ IP MIDI usa multicast UDP 225.0.0.37 e portas 21928–21937 por defeito, sem abr
 
 MTC gera quarter frames e full frames, incluindo 29,97 DF. LTC em áudio gera e lê frames com codificação biphase-mark. A escolha de fps é manual na leitura LTC não drop-frame porque o sinal não identifica inequivocamente 24/25/30. O modo de seguimento está desligado por defeito; segue a música selecionada e pára quando perde o sinal. O processamento e o áudio têm latência dependente do hardware. Não há garantia de sincronismo com precisão de amostra, genlock de vídeo, leitura LTC em marcha inversa nem ensaio de palco certificado.
 
-Falta validação física: 2 PCs multicast, todas as interfaces reais, full-frame SysEx, cabos LTC áudio com ruído, compensação de latência, vários monitores, instalação/desinstalação Windows e teste de portátil numa conta limpa. Os testes automatizados não substituem esses ensaios.
+Falta validação física: 2 PCs multicast, todas as interfaces reais, full-frame SysEx, cabos LTC áudio com ruído, compensação de latência, vários monitores, teste de portátil numa conta limpa. O workflow executa instalação, arranque e desinstalação num Windows descartável; ver o resultado da execução da versão. Os testes automatizados não substituem esses ensaios.
 
 Referências de protocolo consultadas (implementação própria): [MIDI Association — Time Code](https://midi.org/midi-time-code), [libltc — documentação do formato LTC](https://github.com/x42/libltc/blob/master/src/ltc.h), [ipMIDI FAQ — multicast](https://www.nerds.de/en/ipmidi_faq.html), [Arduino-ipMIDI — portas UDP](https://github.com/lathoub/Arduino-ipMIDI).

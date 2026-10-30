@@ -85,10 +85,11 @@ async function run(){
   await new Promise(resolve=>setTimeout(resolve,250));
   await evaluate(`check((await getSongs())[0].lyricOutputSettings['1'].fontSize===57,'Mosaic size not saved');check(!testErrors.length,testErrors.join('\\n'));`);
   console.log('Editable mixer names, 5 pedals, CC/PC/Note/Song mapping and mosaic controls: OK');
+  await require('./annotations.cjs')({win,mosaic,evaluate,children});
   const reloaded=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.reload();await reloaded;
   await evaluate(`for(let i=0;i<100&&!document.querySelector('.library-song');i++)await new Promise(resolve=>setTimeout(resolve,30));`);
   const saved=await win.webContents.executeJavaScript(`({songs:document.querySelectorAll('.library-song').length,version:document.querySelector('.app-version').textContent,studio:document.body.classList.contains('live-mode')})`);
-  if(saved.songs!==1||saved.version!==expectedVersion||!saved.studio)throw new Error('Reload persistence failed '+JSON.stringify(saved));
+  if(saved.songs!==2||saved.version!==expectedVersion||!saved.studio)throw new Error('Reload persistence failed '+JSON.stringify(saved));
   if(errors.length)throw new Error(errors.join('\n'));
   console.log('Editor layout, save, Learn, password confirmation and reload persistence: OK');
 }

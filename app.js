@@ -39,7 +39,7 @@ function loadDisplayOutputs() {
   const fallback = ["Vocalista", "Banda", "Público", "Teleponto"].map((name, index) => ({ id: String(index + 1), name, color: ["#65e2c1", "#79a9ff", "#f0b36c", "#d59aff"][index] }));
   try {
     const saved = JSON.parse(localStorage.getItem("stageset-display-outputs") || "null");
-    if (Array.isArray(saved)) return saved.slice(0, 8).map((item, index) => ({ id: String(item.id || index + 1), name: String(item.name || `Ecrã ${index + 1}`).slice(0, 40), displayId: String(item.displayId || ""), color: /^#[\da-f]{6}$/i.test(item.color) ? item.color : fallback[index % fallback.length].color }));
+    if (Array.isArray(saved)) return saved.slice(0, 8).map((item, index) => ({ id: String(item.id || index + 1), name: String(item.name || `Ecrã ${index + 1}`).slice(0, 40), displayId: String(item.displayId || ""), mosaicVisible: item.mosaicVisible !== false, color: /^#[\da-f]{6}$/i.test(item.color) ? item.color : fallback[index % fallback.length].color }));
   } catch {}
   localStorage.setItem("stageset-display-outputs", JSON.stringify(fallback));
   return fallback;
@@ -519,7 +519,7 @@ async function connectAudioStems(song) {
     element.addEventListener("timeupdate", updatePlayback);
     element.addEventListener("loadedmetadata", () => {
       stem.duration = element.duration;
-      song.duration = Math.max(Number.isFinite(audio.duration) ? audio.duration : 0, ...song.audioStems.map((item) => Number.isFinite(item.duration) ? item.duration : 0));
+      song.duration = Math.max(hasMidiLayer(song) ? midiData?.duration || 0 : 0, Number.isFinite(audio.duration) ? audio.duration : 0, ...song.audioStems.map((item) => Number.isFinite(item.duration) ? item.duration : 0));
       dbPut(song).catch(() => {});
       if (selectedSong()?.id === song.id) syncTrackDetails();
       renderLibrary();
@@ -1207,56 +1207,32 @@ function colorWithAlpha(hex, alpha = 0.34) {
 }
 
 function lyricOutputSettings(song, target = "main") {
-  if (target === "main") return song?.lyricDisplaySettings ?? {};
-  const index = state.displayOutputs.findIndex((output) => output.id === target);
-  return song?.lyricOutputSettings?.[target] ?? song?.lyricOutputSettings?.[index >= 0 ? String(index + 1) : ""] ?? {};
+  return target === "main" ? song?.lyricDisplaySettings ?? {} : song?.lyricOutputSettings?.[target] ?? {};
+}
+
+function outputWindowName(output) { return 'stageset-lyrics-' + output.id; }
+
+function outputLyricFrame(song, output, fallback, fallbackIndex, timestamps = false) {
+  const raw = song?.lyricOutputLyrics?.[output.id] ?? song?.lyricsText;
+  if (!raw && !Object.hasOwn(song?.lyricOutputLyrics ?? {}, output.id)) return { lines: fallback.map(line => timestamps ? line : line.replace(/\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*/g, '')), currentIndex: fallbackIndex };
+  const parsed = parseLyrics(raw || '');
+  const timed = parsed.timeLines.length ? parsed.timeLines : midiData?.barBeatToSeconds ? parsed.barBeatLines.map(line => ({...line, time:midiData.barBeatToSeconds(line.bar,line.beat)})) : [];
+  const source = (raw || '').split(/\r?\n/);
+  const all = timed.length ? timed.map(line => timestamps ? source[line.sourceIndex] : line.text) : source;
+  const active = timed.length ? timed.reduce((found,line,index) => line.time <= currentPosition() ? index : found, -1) : state.autoScroll && currentDuration() ? Math.min(all.length-1, Math.floor(currentPosition()/currentDuration()*all.length)) : Math.min(all.length-1,state.manualLyricOffset);
+  const start = Math.max(0, Math.min(all.length - 5, active - 2));
+  return {lines:all.slice(start,start+5), currentIndex:active < 0 ? -1 : active-start};
 }
 
 function broadcastLyricWindows(lines, currentIndex = -1) {
-  const song = selectedSong();
-  state.displayWindows.forEach((windowRef, index) => {
-    const output = state.displayOutputs[index];
-    const target = output?.id ?? String(index + 1);
-    if (!windowRef || windowRef.closed || !output) return;
-    let outputLines = [...lines];
-    let outputIndex = currentIndex;
-    const legacyTarget = String(index + 1);
-    const overrideTarget = song?.lyricOutputLyrics && Object.hasOwn(song.lyricOutputLyrics, target) ? target : legacyTarget;
-    const hasOverride = song?.lyricOutputLyrics && Object.hasOwn(song.lyricOutputLyrics, overrideTarget);
-    if (hasOverride) {
-      const raw = song.lyricOutputLyrics[overrideTarget] ?? "";
-      const parsed = parseLyrics(raw).timeLines;
-      if (parsed.length) {
-        const active = parsed.reduce((found, line, lineIndex) => line.time <= currentPosition() ? lineIndex : found, -1);
-        const start = Math.max(0, Math.min(parsed.length - 5, active < 0 ? 0 : active - 2));
-        outputLines = parsed.slice(start, start + 5).map((line) => line.text);
-        outputIndex = active < 0 ? -1 : active - start;
-      } else {
-        const allLines = raw.split(/\r?\n/);
-        const start = Math.max(0, Math.min(allLines.length - 5, currentIndex < 0 ? 0 : currentIndex - 2));
-        outputLines = allLines.slice(start, start + 5);
-        outputIndex = currentIndex < 0 || !outputLines.length ? -1 : Math.max(0, Math.min(outputLines.length - 1, currentIndex - start));
-      }
-    }
-    const prefs = lyricOutputSettings(song, target);
-    const payload = { lines: outputLines, htmlLines: outputLines.map(coloredLyricHtml), currentIndex: outputIndex, color: prefs.highlightColor || output.color || "#65e2c1", baseColor: output.color || "#65e2c1", fontSize: Math.max(16, Math.min(96, Number(prefs.fontSize) || 42)), output: output.id, name: output.name };
-    try { windowRef.postMessage({ type: "stageset-lyrics", ...payload }, "*"); } catch {}
-  });
-  if (state.mosaicWindow && !state.mosaicWindow.closed) state.displayOutputs.forEach((output, index) => {
-    const target = output.id, prefs = lyricOutputSettings(song, target);
-    let outputLines = [...lines], outputIndex = currentIndex;
-    const raw = song?.lyricOutputLyrics?.[target] ?? song?.lyricOutputLyrics?.[String(index + 1)] ?? song?.lyricsText;
-    if (typeof raw === "string") {
-      const parsed = parseLyrics(raw).timeLines;
-      if (parsed.length) {
-        const active = parsed.reduce((found, line, lineIndex) => line.time <= currentPosition() ? lineIndex : found, -1);
-        const start = Math.max(0, Math.min(parsed.length - 5, active < 0 ? 0 : active - 2));
-        const sourceLines = raw.split(/\r?\n/);
-        outputLines = parsed.slice(start, start + 5).map((line) => (localStorage.getItem("stageset-mosaic-timestamps") === "true") ? sourceLines[line.sourceIndex] : line.text); outputIndex = active < 0 ? -1 : active - start;
-      } else outputLines = raw.split(/\r?\n/);
-    }
-    if (!(localStorage.getItem("stageset-mosaic-timestamps") === "true")) outputLines = outputLines.map((line) => line.replace(/\[(?:\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?)\]\s*/g, ""));
-    try { state.mosaicWindow.postMessage({ type: "stageset-mosaic", displays: availableDisplays, desktop: !!window.stageSetDesktop, displayId: output.displayId || "", timestamps: localStorage.getItem("stageset-mosaic-timestamps") === "true", output: output.id, slot: index + 1, name: output.name, color: prefs.highlightColor || output.color, baseColor: output.color, fontSize: Number(prefs.fontSize) || 42, lines: outputLines, htmlLines: outputLines.map(coloredLyricHtml), currentIndex: outputIndex }, "*"); } catch {}
+  const song = selectedSong(), timestamps = localStorage.getItem('stageset-mosaic-timestamps') === 'true';
+  if (state.mosaicWindow && !state.mosaicWindow.closed) state.mosaicWindow.postMessage({type:'stageset-mosaic-outputs', outputs:state.displayOutputs.map(output=>output.id)}, location.origin);
+  state.displayOutputs.forEach((output,index) => {
+    const prefs = lyricOutputSettings(song,output.id);
+    const common = {displays:availableDisplays,desktop:!!window.stageSetDesktop,displayId:output.displayId||'',output:output.id,name:output.name,color:prefs.highlightColor||output.color,baseColor:output.color,fontSize:Number(prefs.fontSize)||42,visible:output.mosaicVisible!==false};
+    const send = (ref,type,withTimes) => { if(!ref||ref.closed)return; const frame=outputLyricFrame(song,output,lines,currentIndex,withTimes);ref.postMessage({type,...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),timestamps},location.origin); };
+    send(state.displayWindows[index],'stageset-lyrics',false);
+    send(state.mosaicWindow,'stageset-mosaic',timestamps);
   });
 }
 
@@ -2230,13 +2206,21 @@ async function saveSongEditor(event) {
   toast("Faixa atualizada.");
 }
 
+function readableMidiLyrics(data) {
+  return (data?.lyrics || []).filter(line=>!line.text.startsWith('@')).map(line=>({...line,text:line.text.replace(/^[\\/]+/,'')}));
+}
+
+function formatLyricTimestamp(seconds) {
+  const centiseconds = Math.max(0,Math.round((Number(seconds)||0)*100));
+  return '['+String(Math.floor(centiseconds/6000)).padStart(2,'0')+':'+String(Math.floor(centiseconds/100)%60).padStart(2,'0')+'.'+String(centiseconds%100).padStart(2,'0')+']';
+}
+
 function editorLyricsFor(song, target) {
   if (target !== "main") {
     if (Object.hasOwn(song.lyricOutputLyrics ?? {}, target)) return song.lyricOutputLyrics[target] ?? "";
-    const index = state.displayOutputs.findIndex((output) => output.id === target);
-    if (index >= 0 && Object.hasOwn(song.lyricOutputLyrics ?? {}, String(index + 1))) return song.lyricOutputLyrics[String(index + 1)] ?? "";
+
   }
-  return song.lyricsText || (state.currentId === song.id ? midiData?.lyrics?.map((line) => line.text).join("\n") : "") || "";
+  return song.lyricsText || (state.currentId === song.id ? readableMidiLyrics(midiData).map((line) => formatLyricTimestamp(line.time) + " " + line.text).join("\n") : "") || "";
 }
 
 function showLyricsEditorOutput(target, storeDraft = true) {
@@ -2321,6 +2305,8 @@ function openLyricsEditor(target = "main", outputOnly = false) {
 }
 
 function closeLyricsEditor() {
+  clearTimeout(lyricsAutoSaveTimer);
+  void autoSaveLyricsDraft();
   editingLyricsSongId = null;
   editingLyricsOutput = "main";
   lyricsEditorOutputOnly = false;
@@ -2331,63 +2317,41 @@ function closeLyricsEditor() {
   $("#lyrics-editor-modal").hidden = true;
 }
 
+function mergedLyricsDraft(song) {
+  const outputLyrics = { ...(song.lyricOutputLyrics ?? {}) };
+  for (const [target,text] of Object.entries(lyricsEditorDrafts)) if(target !== 'main') outputLyrics[target] = text;
+  const updated = {...song,lyricOutputLyrics:outputLyrics};
+  if(Object.hasOwn(lyricsEditorDrafts,'main')) {
+    updated.lyricsText = lyricsEditorDrafts.main;
+    const parsed = parseLyrics(updated.lyricsText); updated.lyricLines = parsed.timeLines; updated.midiLyricLines = parsed.barBeatLines;
+  }
+  const bpm = Number($('#lyrics-bpm').value);
+  if(Number.isFinite(bpm) && bpm >= 20 && bpm <= 300) updated.bpm = bpm;
+  return updated;
+}
+
 async function saveLyricsEditor(event) {
-  event.preventDefault();
-  if (!requireStudio()) return;
-  const index = state.songs.findIndex((song) => song.id === editingLyricsSongId);
-  if (index < 0) return closeLyricsEditor();
-  lyricsEditorDrafts[editingLyricsOutput] = $("#lyrics-editor-text").value;
-  const outputLyrics = { ...(state.songs[index].lyricOutputLyrics ?? {}) };
-  for (const [target, text] of Object.entries(lyricsEditorDrafts)) if (target !== "main") outputLyrics[target] = text;
-  if (editingLyricsOutput !== "main") {
-    const savedTarget = state.displayOutputs.find((output) => output.id === editingLyricsOutput)?.name ?? editingLyricsOutput;
-    const updated = { ...state.songs[index], lyricOutputLyrics: outputLyrics };
-    try { await dbPut(updated); } catch { return toast("Não foi possível guardar as letras deste ecrã."); }
-    state.songs[index] = updated;
-    closeLyricsEditor();
-    broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current")));
-    toast(`Letras da saída ${savedTarget} guardadas.`);
-    return;
-  }
-  const rawBpm = $("#lyrics-bpm").value.trim();
-  const bpm = rawBpm ? Number(rawBpm) : null;
-  if (bpm !== null && (!Number.isFinite(bpm) || bpm < 20 || bpm > 300)) return toast("O BPM deve estar entre 20 e 300.");
-  const updated = { ...state.songs[index], lyricsText: lyricsEditorDrafts.main, lyricOutputLyrics: outputLyrics };
-  if (bpm === null) delete updated.bpm; else updated.bpm = bpm;
-  const parsed = parseLyrics(updated.lyricsText);
-  updated.lyricLines = parsed.timeLines;
-  updated.midiLyricLines = parsed.barBeatLines;
-  try {
-    await dbPut(updated);
-  } catch {
-    return toast("Não foi possível guardar as letras.");
-  }
-  state.songs[index] = updated;
-  closeLyricsEditor();
-  if (state.currentId === updated.id) renderLyrics();
-  toast(updated.lyricLines.length ? "Letras e tempos guardados." : "Letras guardadas.");
+  event.preventDefault(); if(!requireStudio()) return;
+  clearTimeout(lyricsAutoSaveTimer);
+  const song = state.songs.find(item=>item.id===editingLyricsSongId); if(!song)return;
+  const bpm = Number($('#lyrics-bpm').value);
+  if(!Number.isFinite(bpm)||bpm<20||bpm>300)return toast('O BPM deve estar entre 20 e 300.');
+  lyricsEditorDrafts[editingLyricsOutput] = $('#lyrics-editor-text').value;
+  const updated = mergedLyricsDraft(song);
+  try { await dbPut(updated); } catch { return toast('Não foi possível guardar as letras.'); }
+  state.songs[state.songs.findIndex(item=>item.id===updated.id)] = updated;
+  closeLyricsEditor(); if(state.currentId===updated.id)renderLyrics();
+  toast('Letras e tempos de todas as saídas editadas guardados.');
 }
 
 async function autoSaveLyricsDraft() {
-  if (!editingLyricsSongId || !$("#lyrics-editor-modal") || $("#lyrics-editor-modal").hidden) return;
-  const index = state.songs.findIndex((song) => song.id === editingLyricsSongId);
-  if (index < 0) return;
-  lyricsEditorDrafts[editingLyricsOutput] = $("#lyrics-editor-text").value;
-  const outputLyrics = { ...(state.songs[index].lyricOutputLyrics ?? {}) };
-  for (const [target, text] of Object.entries(lyricsEditorDrafts)) if (target !== "main") outputLyrics[target] = text;
-  const updated = { ...state.songs[index], lyricOutputLyrics: outputLyrics };
-  if (editingLyricsOutput === "main") {
-    updated.lyricsText = lyricsEditorDrafts.main;
-    const parsed = parseLyrics(updated.lyricsText);
-    updated.lyricLines = parsed.timeLines;
-    updated.midiLyricLines = parsed.barBeatLines;
-  }
-  try {
-    await dbPut(updated);
-    state.songs[index] = updated;
-    if (state.currentId === updated.id) renderLyrics();
-    toast("Rascunho guardado automaticamente.");
-  } catch { toast("Não foi possível guardar o rascunho."); }
+  if(!editingLyricsSongId || $('#lyrics-editor-modal').hidden)return;
+  const song = state.songs.find(item=>item.id===editingLyricsSongId); if(!song)return;
+  lyricsEditorDrafts[editingLyricsOutput] = $('#lyrics-editor-text').value;
+  const updated = mergedLyricsDraft(song);
+  state.songs[state.songs.findIndex(item=>item.id===updated.id)] = updated;
+  try { await dbPut(updated); if(state.currentId===updated.id)renderLyrics(); }
+  catch { toast('Não foi possível guardar o rascunho.'); }
 }
 
 async function exportLyricsMidi(extension = "kar") {
@@ -2495,20 +2459,13 @@ function applyLyricColorToSelection() {
 }
 
 function openLyricDisplayWindows() {
-  const count = state.displayOutputs.length;
-  for (let i = 0; i < state.displayWindows.length; i++) if (state.displayWindows[i]?.closed) state.displayWindows[i] = null;
-  for (let i = 0; i < count; i++) {
-    if (state.displayWindows[i]) continue;
-    const output = state.displayOutputs[i];
-    const display = window.open("", `stageset-lyrics-${i + 1}`, "popup,width=1100,height=700,resizable=yes");
-    if (!display) { toast("Permite pop-ups para abrir ecrãs de letras adicionais."); break; }
-    display.document.open();
-    display.document.write(`<!doctype html><html lang="pt"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StageSet · ${escapeHtml(output.name)}</title><style>*{box-sizing:border-box}body{margin:0;background:#10141b;color:#f4f7f6;font:600 5vw/1.35 system-ui,sans-serif;display:grid;place-items:center;width:100vw;height:100vh;overflow:hidden}.stage{width:92vw;max-height:90vh;display:flex;flex-direction:column;justify-content:center;gap:.28em;text-align:center}.line{padding:.12em .3em;border-radius:.16em;color:#87969b}.current{color:#fff}.blank{height:.7em}</style><main class="stage" id="stage"></main><script>addEventListener('message',e=>{if(e.source!==opener||e.data?.type!=='stageset-lyrics'||e.data.output!==${JSON.stringify(output.id)})return;const d=e.data;document.title='StageSet · '+d.name;const stage=document.querySelector('#stage');stage.replaceChildren(...(d.lines||[]).map((text,index)=>{const p=document.createElement('div');p.className='line'+(index===d.currentIndex?' current':'')+(text?'':' blank');if(d.htmlLines?.[index]!==undefined)p.innerHTML=d.htmlLines[index];else p.textContent=text||' ';p.style.color=d.baseColor||'#87969b';p.style.fontSize=(d.fontSize||42)+'px';if(index===d.currentIndex)p.style.background=d.color+'55';return p}))});</script></html>`);
-    display.document.close();
-    state.displayWindows[i] = display;
-  }
-  broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current")));
-  $("#settings-modal").hidden = true;
+  state.displayOutputs.forEach((output,index) => {
+    if(state.displayWindows[index] && !state.displayWindows[index].closed)return;
+    const url = new URL('./lyric-window.html',location.href);url.searchParams.set('output',output.id);
+    state.displayWindows[index] = window.open(url.href,outputWindowName(output),'popup,width=1100,height=700,resizable=yes');
+    if(!state.displayWindows[index])toast('Permite pop-ups para abrir ecrãs de letras adicionais.');
+  });
+  $('#settings-modal').hidden=true;
 }
 
 function renderDisplayOutputSettings() {
@@ -2523,13 +2480,13 @@ function renderDisplayOutputSettings() {
     const display = document.createElement("select"); display.setAttribute("aria-label", `Saída de vídeo de ${output.name}`); display.add(new Option("Ecrã atual", ""));
     for (const item of availableDisplays) display.add(new Option(item.name + (item.primary ? " (principal)" : ""), item.id));
     display.value = output.displayId || ""; display.disabled = !window.stageSetDesktop?.assignDisplay;
-    display.addEventListener("change", () => { output.displayId = display.value; saveDisplayOutputs(); void window.stageSetDesktop.assignDisplay(`stageset-lyrics-${index + 1}`, display.value); });
+    display.addEventListener("change", () => { output.displayId = display.value; saveDisplayOutputs(); void window.stageSetDesktop.assignDisplay(outputWindowName(output), display.value); });
     color.addEventListener("input", () => { output.color = color.value; saveDisplayOutputs(); if (editingLyricsOutput === output.id) showLyricsEditorOutput(output.id, false); broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current"))); });
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "backup-button"; edit.textContent = "Editar letras"; edit.addEventListener("click", () => { $("#settings-modal").hidden = true; openLyricsEditor(output.id, true); });
     const size = document.createElement("input"); size.type = "number"; size.min = "16"; size.max = "96"; size.step = "1"; size.value = String(Number(lyricOutputSettings(selectedSong() || {}, output.id).fontSize) || 42); size.title = "Tamanho da letra para a música atual"; size.setAttribute("aria-label", `Tamanho de letra de ${output.name}`);
     size.addEventListener("input", () => { const value = Number(size.value); if (!selectedSong() || !Number.isFinite(value) || value < 16 || value > 96) return; void saveLyricOutputSettings(output.id, { fontSize: value }); });
     const remove = document.createElement("button"); remove.type = "button"; remove.className = "backup-button"; remove.textContent = "Remover"; remove.disabled = state.displayOutputs.length <= 1;
-    remove.addEventListener("click", () => { state.displayOutputs.splice(index, 1); state.displayWindows.splice(index, 1).forEach((ref) => { try { ref?.close(); } catch {} }); saveDisplayOutputs(); renderDisplayOutputSettings(); void refreshDisplays(); });
+    remove.addEventListener("click", () => { state.displayOutputs.splice(index, 1); state.displayWindows.splice(index, 1).forEach((ref) => { try { ref?.close(); } catch {} }); saveDisplayOutputs(); renderDisplayOutputSettings(); refreshMosaic(); void refreshDisplays(); });
     row.append(name, color, display, size, edit, remove); container.append(row);
   });
   $("#create-display-output").disabled = state.displayOutputs.length >= 8;
@@ -2544,10 +2501,10 @@ async function refreshDisplays() {
     const select = $(selector); select.replaceChildren(new Option("Ecrã atual", ""));
     for (const item of availableDisplays) select.add(new Option(item.name + (item.primary ? " (principal)" : ""), item.id));
     select.value = localStorage.getItem(key) || "";
-    if (select.value && target !== "main") await window.stageSetDesktop.assignDisplay(target, select.value);
+    if (select.value) await window.stageSetDesktop.assignDisplay(target, select.value);
     select.onchange = () => { localStorage.setItem(key, select.value); void window.stageSetDesktop.assignDisplay(target, select.value); };
   }
-  for (const [index, output] of state.displayOutputs.entries()) await window.stageSetDesktop.assignDisplay(`stageset-lyrics-${index + 1}`, output.displayId || "");
+  for (const [index, output] of state.displayOutputs.entries()) await window.stageSetDesktop.assignDisplay(outputWindowName(output), output.displayId || "");
   renderDisplayOutputSettings();
 }
 
@@ -2577,15 +2534,20 @@ function openLyricsMosaic() {
 }
 function refreshMosaic(){broadcastLyricWindows(currentRenderedLyricLines(),[...document.querySelectorAll('#lyrics-content .lyric-line')].findIndex(line=>line.classList.contains('current')));}
 window.addEventListener('message',event=>{
-  if(event.source!==state.mosaicWindow)return;
+  if(event.origin!==location.origin)return;
+  const mosaic=event.source===state.mosaicWindow;
+  const windowIndex=state.displayWindows.findIndex(ref=>ref===event.source);
+  if(!mosaic && windowIndex<0)return;
   const d=event.data;
-  if(d?.type==='stageset-mosaic-ready'){void refreshDisplays().then(refreshMosaic);return;}
-  if(d?.type==='stageset-mosaic-timestamps'){localStorage.setItem('stageset-mosaic-timestamps',String(!!d.value));refreshMosaic();return;}
-  if(d?.type!=='stageset-mosaic-setting'||!requireStudio())return;
-  const output=state.displayOutputs.find(o=>o.id===d.output);if(!output)return;
+  if(d?.type==='stageset-mosaic-ready'||d?.type==='stageset-output-ready'){void refreshDisplays().then(refreshMosaic);return;}
+  if(d?.type==='stageset-mosaic-timestamps' && mosaic){localStorage.setItem('stageset-mosaic-timestamps',String(!!d.value));refreshMosaic();return;}
+  if(!['stageset-mosaic-setting','stageset-output-setting'].includes(d?.type))return;
+  const output=state.displayOutputs.find(o=>o.id===d.output);if(!output || (!mosaic && state.displayOutputs[windowIndex]!==output))return;
+  if(typeof d.visible==='boolean'){output.mosaicVisible=d.visible;saveDisplayOutputs();refreshMosaic();}
   if(Number.isInteger(d.fontSize)&&d.fontSize>=16&&d.fontSize<=96)void saveLyricOutputSettings(output.id,{fontSize:d.fontSize});
-  if(typeof d.displayId==='string'&&window.stageSetDesktop?.assignDisplay&&(d.displayId===''||availableDisplays.some(display=>display.id===d.displayId))){output.displayId=d.displayId;saveDisplayOutputs();void window.stageSetDesktop.assignDisplay('stageset-lyrics-'+(state.displayOutputs.indexOf(output)+1),d.displayId);refreshMosaic();}
+  if(typeof d.displayId==='string'&&window.stageSetDesktop?.assignDisplay&&(d.displayId===''||availableDisplays.some(display=>display.id===d.displayId))){output.displayId=d.displayId;saveDisplayOutputs();void window.stageSetDesktop.assignDisplay(outputWindowName(output),d.displayId);refreshMosaic();}
 });
+
 
 function setLyricHighlightColor(color) {
   if (!/^#[\da-f]{6}$/i.test(color)) return;
@@ -3386,7 +3348,7 @@ function renderLyrics() {
   const taggedMidiLines = midiData?.barBeatToSeconds && song?.midiLyricLines?.length
     ? song.midiLyricLines.map((line) => ({ time: midiData.barBeatToSeconds(line.bar, line.beat), text: line.text, sourceIndex: line.sourceIndex }))
     : [];
-  const embeddedMidiLyrics = midiData?.lyrics ?? [];
+  const embeddedMidiLyrics = readableMidiLyrics(midiData);
   const baseTimedLines = song?.lyricLines?.length ? song.lyricLines : taggedMidiLines.length ? taggedMidiLines : embeddedMidiLyrics;
   const timedLines = song?.lyricsText && baseTimedLines.length ? (() => {
     const sourceLines = song.lyricsText.split(/\r?\n/), bySource = new Map();
@@ -3623,7 +3585,8 @@ async function selectSong(id, autoplay = false, { quickie = false } = {}) {
           allMidiOutputs().find((item) => item.id === route) ?? undefined;
         await midiPlayer.setChannelOutput(channel, output);
       }
-      if (isMidiSong(song)) song.duration = midiData.duration;
+      song.duration = Math.max(song.duration || 0, midiData.duration);
+      if (!song.bpm) song.bpm = midiData.tempo;
       await midiPlayer.setRate(song.tempo ?? 1);
       await midiPlayer.setTranspose(song.transpose ?? 0);
       await dbPut(song);
@@ -3914,13 +3877,17 @@ async function createGroupedSong(files, title) {
   if (midiFiles.length > 1) return toast("Escolhe apenas um ficheiro MIDI/KAR por música.");
   const audioFiles = files.filter((file) => !/\.(mid|midi|kar)$/i.test(file.name) && (file.type.startsWith("audio/") || /\.(mp3|wav|m4a|ogg|flac|mogg)$/i.test(file.name)));
   const zipFiles = files.filter((file) => /\.zip$/i.test(file.name));
-  const base = audioFiles.shift() || emptyAudioFile();
+  try { for (const file of zipFiles) audioFiles.push(...await extractAudioStems(file)); }
+  catch(error) { return toast(error.message || 'Não foi possível ler o ZIP.'); }
+  if(audioFiles.length > 32)return toast('Cada música pode ter até 32 pistas de áudio.');
+  const midiOnly = !audioFiles.length && midiFiles.length === 1;
+  const base = audioFiles.shift() || (midiOnly ? midiFiles[0] : emptyAudioFile());
   let midi = null;
   try { if (midiFiles[0]) { midi = parseMidiFile(await midiFiles[0].arrayBuffer()); } } catch (error) { return toast(error.message || "MIDI inválido."); }
   let metadata;
-  try { metadata = await readAudioChannelMetadata(base); } catch (error) { return toast(error.message || "Áudio inválido."); }
-  const song = { id: crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => n.toString(16).padStart(2, "0")).join(""), title: title.trim(), artist: "", fileName: base.name, duration: 0, addedAt: Date.now(), favorite: false, playCount: 0, tags: [], audioChannels: metadata?.channels ?? 1, audioFormat: metadata?.format ?? "audio", audioBlob: base, lyricsText: "", lyricLines: [], ...(midi ? { midiBlob: midiFiles[0], midiFileName: midiFiles[0].name, bpm: midi.tempo } : {}) };
-  try { await dbPut(song); state.songs.push(song); renderLibrary(); await selectSong(song.id); if (audioFiles.length || zipFiles.length) await addAudioStems([...audioFiles, ...zipFiles], song); toast("Música criada."); } catch (error) { toast(error.message || "Não foi possível criar a música."); }
+  try { metadata = midiOnly ? null : await readAudioChannelMetadata(base); } catch (error) { return toast(error.message || "Áudio inválido."); }
+  const song = { id: crypto.randomUUID ? crypto.randomUUID() : Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => n.toString(16).padStart(2, "0")).join(""), title: title.trim(), artist: "", fileName: base.name, duration: 0, addedAt: Date.now(), favorite: false, playCount: 0, tags: [], audioChannels: metadata?.channels ?? 1, audioFormat: metadata?.format ?? "audio", audioBlob: base, lyricsText: "", lyricLines: [], ...(midi ? { ...(midiOnly ? {} : { midiBlob: midiFiles[0], midiFileName: midiFiles[0].name }), bpm: midi.tempo, duration: midi.duration } : {}), ...(metadata?.moggOffset !== undefined ? { moggOffset: metadata.moggOffset } : {}) };
+  try { await dbPut(song); state.songs.push(song); renderLibrary(); await selectSong(song.id); if (audioFiles.length) await addAudioStems(audioFiles, song); toast("Música criada."); } catch (error) { toast(error.message || "Não foi possível criar a música."); }
 }
 
 async function importLyrics(file) {
@@ -4267,7 +4234,17 @@ $("#lyrics-play-button").addEventListener("click", () => $("#play").click());
 $("#lyric-size-down").addEventListener("click", () => adjustStageLyricSize(-2));
 $("#lyric-size-up").addEventListener("click", () => adjustStageLyricSize(2));
 $("#lyrics-import-button").addEventListener("click", () => $("#lyrics-file").click());
-$("#lyrics-file").addEventListener("change", async (event) => { const file = event.target.files?.[0]; if (file) { const text = await file.text(); if (editingLyricsOutput === "main") { await importLyrics(file); $("#lyrics-editor-text").value = text; } else { $("#lyrics-editor-text").value = text; lyricsEditorDrafts[editingLyricsOutput] = text; } renderLyricsEditorPreview(); } event.target.value = ""; });
+$("#lyrics-file").addEventListener("change", async (event) => {
+  const file=event.target.files?.[0];event.target.value='';if(!file||!editingLyricsSongId)return;
+  try {
+    const midi=/\.(mid|midi|kar)$/i.test(file.name) ? parseMidiFile(await file.arrayBuffer()) : null;
+    if(midi)$('#lyrics-bpm').value=String(midi.tempo);
+    const text=midi ? readableMidiLyrics(midi).map(line=>formatLyricTimestamp(line.time)+' '+line.text).join('\n') : await file.text();
+    if(midi&&!text.trim())return toast('BPM importado; o MIDI não contém letras.');
+    $('#lyrics-editor-text').value=text;renderLyricsEditorPreview();await autoSaveLyricsDraft();
+    toast(midi?'Letras, tempos e BPM importados.':'Letras importadas.');
+  } catch(error) { toast(error.message||'Não foi possível importar as letras.'); }
+});
 $("#lyrics-export-kar").addEventListener("click", () => { void exportLyricsMidi("kar"); });
 $("#lyrics-export-midi").addEventListener("click", () => { void exportLyricsMidi("mid"); });
 $("#lyrics-export-text").addEventListener("click", () => { const song = selectedSong(); if (!song) return; const label = editingLyricsOutput === "main" ? "Palco" : (state.displayOutputs.find((output) => output.id === editingLyricsOutput)?.name || "Saida"); const url = URL.createObjectURL(new Blob([$("#lyrics-editor-text").value], {type:"text/plain;charset=utf-8"})); const link = document.createElement("a"); link.href = url; link.download = `${song.title}-${label}`.replace(/[\\/:*?"<>|]+/g, "-") + ".txt"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); });
@@ -4408,12 +4385,11 @@ $("#midi-layer-file").addEventListener("change", async (event) => {
   const song = selectedSong();
   event.target.value = "";
   if (!file || !song) return;
-  song.midiBlob = file;
-  song.midiFileName = file.name;
-  song.tempo = 1;
-  await dbPut(song);
-  await selectSong(song.id);
-  toast("Faixa MIDI associada à música.");
+  try {
+    const imported=parseMidiFile(await file.arrayBuffer());
+    song.midiBlob=file;song.midiFileName=file.name;song.bpm=imported.tempo;song.tempo=1;
+    await dbPut(song);await selectSong(song.id);toast('Faixa MIDI e BPM associados à música.');
+  } catch(error) { toast(error.message || 'Não foi possível ler o MIDI/KAR.'); }
 });
 $("#cdg-layer-button").addEventListener("click", () => selectedSong() && !isMidiSong(selectedSong()) ? $("#cdg-layer-file").click() : toast("Escolhe uma faixa MP3 ou WAV primeiro."));
 $("#cdg-layer-file").addEventListener("change", async (event) => {
@@ -4581,7 +4557,7 @@ audio.addEventListener("timeupdate", updatePlayback);
 audio.addEventListener("loadedmetadata", () => {
   const song = selectedSong();
   if (song && Number.isFinite(audio.duration)) {
-    song.duration = Math.max(audio.duration, ...(song.audioStems ?? []).map((stem) => Number.isFinite(stem.duration) ? stem.duration : 0));
+    song.duration = Math.max(audio.duration, hasMidiLayer(song) ? midiData?.duration || 0 : 0, ...(song.audioStems ?? []).map((stem) => Number.isFinite(stem.duration) ? stem.duration : 0));
     dbPut(song);
     $("#track-duration").textContent = formatTime(song.duration);
     $("#remaining").textContent = `-${formatTime(song.duration)}`;
@@ -4730,6 +4706,7 @@ document.addEventListener("keydown", (event) => {
 async function initialize() {
   updateModeUi();
   saveDisplayOutputs();
+  void refreshDisplays().catch(() => {});
   installWorkspaceResizing();
   renderPedalMap();
   try {
@@ -4768,7 +4745,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 
-const transferSettingKeys=['stageset-display-outputs','stageset-button-shortcuts','stageset-queue-end-action','stageset-lyric-highlight'];
+const transferSettingKeys=['stageset-display-outputs','stageset-button-shortcuts','stageset-queue-end-action','stageset-lyric-highlight','stageset-mosaic-timestamps','stageset-main-display','stageset-mosaic-display'];
 syncController=setupSync({getInputs:allMidiInputs,getOutputs:allMidiOutputs,connectMidi:()=>requestMidiAccess({notify:true,sysex:true}),position:currentPosition,playing:isPlaying,seek:seekPlaybackTo,play:async()=>{if(!isPlaying())$('#play').click();},pause:pausePlayback,speed:()=>selectedSong()?.tempo||1,report:toast});
 $('#ip-midi-start').disabled=!window.stageSetDesktop?.startIpMidi;
 if(!window.stageSetDesktop?.startIpMidi)$('#ip-midi-status').textContent='Disponível na aplicação desktop.';

@@ -31,7 +31,7 @@ if (!hasSingleInstance) {
     return screen.getAllDisplays().map((display, index) => ({ id: String(display.id), name: display.label || `Ecrã ${index + 1}`, primary: display.id === primary.id }));
   });
   ipcMain.handle("displays:assign", (event, target, id) => {
-    if (event.sender !== mainWindow?.webContents || typeof target !== "string" || !/^(main|stageset-lyrics-\d+|stageset-lyrics-mosaic)$/.test(target)) return false;
+    if (event.sender !== mainWindow?.webContents || typeof target !== "string" || !/^(main|stageset-lyrics-[a-zA-Z0-9-]{1,80})$/.test(target)) return false;
     if (!id) { displayAssignments.delete(target); return true; }
     const display = screen.getAllDisplays().find((item) => String(item.id) === id);
     if (!display) return false;

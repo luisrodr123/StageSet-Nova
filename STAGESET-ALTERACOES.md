@@ -1,5 +1,20 @@
 # StageSet — alterações anotadas
 
+## 2026-10-30 — versão 0.10.0
+
+- Corrigida a perda do rascunho do palco principal quando se guardava noutra saída; gravação e autosave conservam todas as saídas editadas e o BPM. Fechar o editor guarda o rascunho pendente.
+- Janelas de letras com tamanho e monitor selecionáveis; identidade estável ao remover outras saídas. Letras de saídas removidas não são reutilizadas por posição.
+- Mosaico: ocultação efetiva, visibilidade persistente e remoção de painéis eliminados. Timestamps continuam opcionais e ocultos por defeito.
+- Importação MIDI/KAR no editor conserva timestamps e BPM; não apresenta cabeçalhos de karaoke. Abrir letras MIDI embutidas já não descarta os tempos. Exportações independentes TXT/KAR verificadas com o nome da saída e BPM.
+- Criação com apenas MIDI/KAR usa o ficheiro original; ZIP de stems expandido antes da escolha da faixa principal, até 32 pistas. Associar MIDI atualiza BPM e duração.
+- Preferências de monitores e timestamps incluídas no backup; ecrãs restaurados no arranque desktop.
+- Consolidado o estado de todos os pedidos em docs/ANOTACOES.md. Versão, lockfile, interface, README e cache atualizados.
+- Validação local aprovada: verificação de sintaxe/IDs/versões, oito testes de protocolos/backup e testes Electron ampliados para rascunhos entre saídas, importação/exportação, controlos das janelas, remoção, mosaico e nova música MIDI. Perfil temporário; biblioteca do utilizador preservada.
+- Workflow acrescenta instalação, arranque e desinstalação num Windows descartável. Resultado de distribuição registado na Release e na execução correspondente do GitHub.
+
+Continuam a exigir equipamento físico: interfaces áudio/MIDI e níveis/latência LTC, vários monitores e comunicação entre dois PCs. Sem driver virtual Windows, RTP-MIDI/AppleMIDI, LTC inverso ou garantia de genlock. Estes limites não são apresentados como funções verificadas.
+
+
 ## 2026-10-28 — versão 0.9.0
 
 Implementado no código:

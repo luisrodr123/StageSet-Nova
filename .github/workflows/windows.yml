@@ -25,6 +25,8 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - run: node scripts/checksums.mjs
+      - name: Instalar, iniciar e desinstalar em Windows isolado
+        run: ./scripts/test-distribution.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: StageSet-Windows-${{ github.sha }}
