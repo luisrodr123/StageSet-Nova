@@ -34,4 +34,4 @@ $removed = Start-Process -FilePath $uninstaller -ArgumentList '/S' -PassThru -Wa
 if ($removed.ExitCode -ne 0) { throw "Desinstalação falhou: $($removed.ExitCode)" }
 for ($attempt = 0; $attempt -lt 30 -and (Test-Path -LiteralPath $executable); $attempt++) { Start-Sleep -Milliseconds 500 }
 if (Test-Path -LiteralPath $executable) { throw 'A desinstalação deixou o executável instalado.' }
-Write-Output "StageSet $releaseVersion: instalar, iniciar e desinstalar no Windows isolado: OK"
+Write-Output "StageSet ${releaseVersion}: instalar, iniciar e desinstalar no Windows isolado: OK"
