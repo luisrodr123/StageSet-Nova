@@ -12,6 +12,11 @@
 - Validação local aprovada: verificação de sintaxe/IDs/versões, oito testes de protocolos/backup e testes Electron ampliados para rascunhos entre saídas, importação/exportação, controlos das janelas, remoção, mosaico e nova música MIDI. Perfil temporário; biblioteca do utilizador preservada.
 - Workflow acrescenta instalação, arranque e desinstalação num Windows descartável. Resultado de distribuição registado na Release e na execução correspondente do GitHub.
 
+Distribuição local gerada: StageSet-0.10.0-Setup-x64.exe e StageSet-0.10.0-Portable-x64.exe. Os testes Electron também passaram usando os ficheiros dentro do app.asar distribuído. Capturas das novas janelas em dist/qa.
+
+- SHA256 portátil: `90b184eb9e4f9ee3c7f319922f7001aa9e727a2a7ada7b2baa0aa880fd86715b`.
+- SHA256 instalador: `09a93b5f3ba5a408bf35d9afb390b80dc46fb07a20fdbdc02f9ee4c8f6234c6b`.
+
 Continuam a exigir equipamento físico: interfaces áudio/MIDI e níveis/latência LTC, vários monitores e comunicação entre dois PCs. Sem driver virtual Windows, RTP-MIDI/AppleMIDI, LTC inverso ou garantia de genlock. Estes limites não são apresentados como funções verificadas.
 
 

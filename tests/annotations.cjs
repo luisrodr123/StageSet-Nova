@@ -34,6 +34,11 @@ module.exports = async ({win,mosaic,evaluate,children}) => {
   const status=await output1.webContents.executeJavaScript(`(async()=>{for(let i=0;i<60&&!document.querySelector('.line');i++)await new Promise(r=>setTimeout(r,30));if(document.querySelector('#stage').textContent.includes('[00:'))throw Error('Timestamp exposed in output');const size=document.getElementById('size');size.value='48';size.dispatchEvent(new Event('input'));return true;})()`);
   if(!status)throw Error('Output controls failed');
   await new Promise(resolve=>setTimeout(resolve,150));
+  const liveSize=await output1.webContents.executeJavaScript("(async()=>{for(let i=0;i<80;i++){if(document.querySelector('.line')?.style.fontSize==='48px'&&document.getElementById('size').value==='48')return true;await new Promise(r=>setTimeout(r,30));}return false;})()");
+  if(!liveSize)throw Error('Font change not reflected live in the output window');
+  const fs=require('node:fs/promises'),path=require('node:path');
+  await fs.writeFile(path.resolve(__dirname,'../dist/qa/lyric-window.png'),(await output1.webContents.capturePage()).toPNG());
+  await fs.writeFile(path.resolve(__dirname,'../dist/qa/mosaic.png'),(await mosaic.webContents.capturePage()).toPNG());
   await evaluate(`check((await getSongs())[0].lyricOutputSettings['1'].fontSize===48,'Window font size not saved');`);
   const hidden=await mosaic.webContents.executeJavaScript(`(()=>{const check=document.querySelector('#selectors input');check.checked=false;check.dispatchEvent(new Event('change'));return getComputedStyle(document.querySelector('.tile')).display;})()`);
   if(hidden!=='none')throw Error('Mosaic checkbox does not hide tile');
