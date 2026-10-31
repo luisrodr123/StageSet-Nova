@@ -9,4 +9,6 @@ Usar **☰ Ecrã** nas janelas, no palco ou no mosaico. A edição requer modo S
 
 Downloads: Portable para executar sem instalação; Setup para instalar. O ficheiro STAGESET-ALTERACOES.md descreve as verificações e limitações e SHA256SUMS.txt permite verificar os binários.
 
+Validação: 21 testes automáticos, sintaxe/IDs/versão e suite Electron com perfil temporário aprovados. A suite Electron também passou no app.asar distribuído (código 535c110). A verificação Windows no GitHub inclui instalação, arranque e desinstalação num runner descartável.
+
 Versão de teste sem assinatura digital. Verificação automática local; ensaiar com os monitores, interfaces e computadores físicos do espetáculo. A ligação de rede não transfere ficheiros e não garante sincronismo áudio à amostra. EPS requer Ghostscript instalado separadamente.

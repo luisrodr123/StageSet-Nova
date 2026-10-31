@@ -13,6 +13,12 @@ Verificação local aprovada: sintaxe/IDs/versões, 21 testes automáticos e sui
 
 Limites de ensaio: fullscreen HTML testado sem ocupar o monitor físico do utilizador; mudança entre vários monitores e utilização em dois PCs físicos requerem ensaio no equipamento do espetáculo. Ativação de fullscreen local a cada janela; não é enviada pelo Master da rede. Os desenhos ficam fixos sobre o ecrã, não ligados a palavras.
 
+Distribuição 0.13.0 gerada e validada: a suite Electron também passou sobre dist/win-unpacked/resources/app.asar, correspondente ao código 535c110. Instalador e portátil Windows x64, sem assinatura digital; SHA256SUMS.txt acompanha os ficheiros.
+
+- StageSet-0.13.0-Portable-x64.exe — SHA256: 8cddec361e82e0f7a34e7c2d0e51889d24a0c900e79ab8afd6824f94a8d75446.
+- StageSet-0.13.0-Setup-x64.exe — SHA256: 5c9b9a5e690783c50c50f28e596c5f8dbf672e5c56bc67d9be5ad7a4a9560b2c.
+- Verificação de instalação/início/desinstalação em Windows isolado submetida ao GitHub: https://github.com/luisrodr123/StageSet-Nova/actions/runs/41231472719. Ainda em execução no momento desta geração local; não foi realizada instalação sobre o perfil do utilizador.
+
 
 ## Versão 0.12.0 — incorporada na 0.13.0
 
