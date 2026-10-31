@@ -24,15 +24,16 @@ if (!hasSingleInstance) {
   const trusted = event => event.sender === mainWindow?.webContents && new URL(event.sender.getURL()).origin === localUrl;
   ipcMain.handle('background:eps', (event, data) => { if(!trusted(event))throw Error('Janela não autorizada.');return require('./background-image.cjs').convertEps(data); });
   const sessionHandlers = {
-    info: () => ({name:require('node:os').hostname(),version:app.getVersion()}),
+    info: async () => ({name:require('node:os').hostname(),version:app.getVersion(),...await require('./network-interfaces.cjs').networkInfo()}),
     start: config => sessionLink.start({...config,version:app.getVersion()}),
     stop: () => sessionLink.stop(),
     choose: (id,selected) => sessionLink.choose(id,!!selected),
+    handoff: id => sessionLink.handoff(id),
     state: value => sessionLink.setState(value),
     feedback: message => sessionLink.feedback(message),
   };
   for(const [name,handler] of Object.entries(sessionHandlers))ipcMain.handle(`session:${name}`,(event,...args)=>{if(!trusted(event))throw Error('Janela não autorizada.');return handler(...args);});
-  for(const name of ['status','control','lost','failure'])sessionLink.on(name,data=>{if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send(`session:${name}`,data);});
+  for(const name of ['status','control','lost','failure','role'])sessionLink.on(name,data=>{if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send(`session:${name}`,data);});
   for (const [name, handler] of Object.entries({start: config => ipMidi.start(config), stop: () => ipMidi.stop(), send: (id,data,delay) => ipMidi.send(id,data,delay), clear: id => ipMidi.clear(id)})) {
     ipcMain.handle(`ipmidi:${name}`, (event,...args) => { if(!trusted(event))throw new Error('Janela não autorizada.');return handler(...args); });
   }
@@ -92,9 +93,9 @@ if (!hasSingleInstance) {
 
 async function startDesktop() {
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(["midi", "midiSysex", "media"].includes(permission) && _webContents.getURL().startsWith(localUrl + '/'));
+    callback(["midi", "midiSysex", "media", "fullscreen"].includes(permission) && _webContents.getURL().startsWith(localUrl + '/'));
   });
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission, origin) => ["midi", "midiSysex", "media"].includes(permission) && origin === localUrl);
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission, origin) => ["midi", "midiSysex", "media", "fullscreen"].includes(permission) && origin === localUrl);
 
   const serverPath = path.join(__dirname, "..", "server.mjs");
   const { createStageSetServer } = await import(pathToFileURL(serverPath).href);
@@ -127,7 +128,7 @@ function createWindow() {
     },
   });
   mainWindow.webContents.setWindowOpenHandler(({ frameName }) => frameName?.startsWith("stageset-lyrics-")
-    ? { action: "allow", overrideBrowserWindowOptions: { width: 1100, height: 700, minWidth: 360, minHeight: 280, autoHideMenuBar: true, ...(() => { const display = screen.getAllDisplays().find((item) => String(item.id) === displayAssignments.get(frameName)); return display ? { x: display.workArea.x, y: display.workArea.y } : {}; })() } }
+    ? { action: "allow", overrideBrowserWindowOptions: { width: 1100, height: 700, minWidth: 360, minHeight: 280, autoHideMenuBar: true, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, preload: undefined }, ...(() => { const display = screen.getAllDisplays().find((item) => String(item.id) === displayAssignments.get(frameName)); return display ? { x: display.workArea.x, y: display.workArea.y } : {}; })() } }
     : { action: "deny" });
   mainWindow.webContents.on("did-create-window", (child, details) => { displayWindows.set(details.frameName, child); child.once("closed", () => { if (displayWindows.get(details.frameName) === child) displayWindows.delete(details.frameName); }); });
   mainWindow.webContents.on("will-navigate", (event, destination) => {

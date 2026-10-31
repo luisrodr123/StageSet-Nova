@@ -1,9 +1,13 @@
 module.exports=async({url,children})=>{
   const {BrowserWindow,ipcMain}=require('electron'),path=require('node:path');
-  let config,feedback='',published;
+  let config,feedback='',published,choice,handoff,publications=0;
+  let info={name:'Test Slave',interfaces:[{name:'Ethernet',address:'192.168.10.20'},{name:'Wi-Fi',address:'192.168.20.30'}],recommendedAddress:'192.168.10.20'};
+  ipcMain.handle('test-session-info',()=>info);
+  ipcMain.handle('test-session-choose',(_,id,selected)=>{choice={id,selected};});
+  ipcMain.handle('test-session-handoff',(_,id)=>{handoff=id;});
   ipcMain.handle('test-session-start',(_,value)=>{config=value;return {role:value.role,peers:[],master:null};});
   ipcMain.handle('test-session-feedback',(_,value)=>{feedback=value;});
-  ipcMain.handle('test-session-state',(_,value)=>{published=value;});
+  ipcMain.handle('test-session-state',(_,value)=>{published=value;publications++;});
   const win=new BrowserWindow({show:false,width:1273,height:930,webPreferences:{preload:path.join(__dirname,'session-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});children.push(win);
   await win.loadURL(url);
   const evalJs=code=>win.webContents.executeJavaScript(`(async()=>{${code}})()`,true);
@@ -11,20 +15,47 @@ module.exports=async({url,children})=>{
   const send=(type,data)=>win.webContents.send('test-session-event',type,data);
   try{
     await until(()=>evalJs(`return !!document.querySelector('.library-song')`));
+    await until(()=>evalJs(`return document.getElementById('session-interface').value==='192.168.10.20'`));
+    if(!await evalJs(`return document.getElementById('ip-midi-interface').value==='192.168.10.20'`))throw Error('IP MIDI interface not populated');
     await evalJs(`document.getElementById('session-name').value='Teste';document.getElementById('session-role').value='slave';document.getElementById('session-code').value='session-test-123';document.getElementById('session-start').click();`);
     await until(()=>config?.role==='slave');
     const song=await evalJs(`return await new Promise(resolve=>{const open=indexedDB.open('stageset-library');open.onsuccess=()=>{const db=open.result,r=db.transaction('songs').objectStore('songs').getAll();r.onsuccess=()=>{db.close();resolve(r.result.find(s=>s.title==='MIDI sem silencio'));};};});`);
     const state={song:{id:song.id,title:song.title,fileName:song.fileName},playing:false,position:1.2,rate:1};
     send('control',state);await until(()=>feedback==='Sincronizado');
+    send('status',{role:'slave',peers:[],master:'Master de palco',connected:true,feedback:'Sincronizado'});
+    await until(()=>evalJs(`return document.getElementById('session-indicator').dataset.connected==='true'`));
+    if(await evalJs(`return getComputedStyle(document.querySelector('#session-indicator .session-led')).backgroundColor`)!=='rgb(255, 154, 56)')throw Error('Slave orange indicator missing');
     if(!await evalJs(`return document.getElementById('elapsed').textContent==='0:01'`))throw Error('Remote locate did not seek MIDI');
     send('control',{...state,playing:true});await until(()=>evalJs(`return document.getElementById('lyrics-play-button').getAttribute('aria-pressed')==='true'`));
     send('lost','Ligação perdida');await until(()=>evalJs(`return document.getElementById('lyrics-play-button').getAttribute('aria-pressed')!=='true'`));
+    if(await evalJs(`return document.getElementById('session-indicator').dataset.connected`)!=='false')throw Error('Lost connection left light on');
     feedback='';send('control',{...state,song:{id:'absent',title:'Missing',fileName:'missing.wav'}});await until(()=>feedback.includes('ausente'));
     if(await evalJs(`return localStorage.getItem('stageset-session-settings').includes('session-test-123')`))throw Error('Session code persisted');
     await evalJs(`document.getElementById('session-stop').click();`);await until(()=>evalJs(`return !document.getElementById('session-start').disabled`));
     config=null;await evalJs(`document.getElementById('session-role').value='master';document.getElementById('session-start').click();`);await until(()=>published);
     if(!published.song||typeof published.position!=='number')throw Error('Master did not publish real playback state');
+    const peer={id:'remote',name:'Vocalista PC',address:'192.168.10.21',version:'0.12.0',role:'available',allowRemote:true,remoteRoles:1,links:0,busy:false,connected:false,selected:false};
+    send('status',{role:'master',peers:[peer],connected:false});
+    await until(()=>evalJs(`return !!document.querySelector('.session-link')`));
+    await evalJs(`document.querySelector('.session-link').click();`);await until(()=>choice?.selected&&choice.id==='remote');
+    send('status',{role:'master',peers:[{...peer,selected:true,status:'A ligar…'}],connected:false});
+    if(await evalJs(`return document.getElementById('session-indicator').dataset.connected`)!=='false')throw Error('Discovery shown as confirmed connection');
+    send('status',{role:'master',peers:[{...peer,role:'slave',selected:true,connected:true,status:'Sincronizado'}],connected:true});
+    await until(()=>evalJs(`return document.getElementById('session-indicator').dataset.connected==='true'`));
+    if(await evalJs(`return getComputedStyle(document.querySelector('#session-indicator .session-led')).backgroundColor`)!=='rgb(51, 158, 255)')throw Error('Master blue indicator missing');
+    if(await evalJs(`return getComputedStyle(document.querySelector('.session-peer .session-led')).backgroundColor`)!=='rgb(255, 154, 56)')throw Error('Remote Slave orange indicator missing');
+    await evalJs(`document.getElementById('session-indicator').click();`);
+    win.setSkipTaskbar(true);win.setPosition(-30000,-30000);win.showInactive();await new Promise(r=>setTimeout(r,200));
+    await require('node:fs/promises').writeFile(path.join(__dirname,'../dist/qa/master-slave.png'),(await win.webContents.capturePage()).toPNG());win.hide();
+    await evalJs(`document.querySelector('.session-handoff').click();`);await until(()=>handoff==='remote');
+    send('role','slave');send('status',{role:'slave',peers:[],master:'Vocalista PC',connected:true,feedback:'Sincronizado'});
+    await until(()=>evalJs(`return document.getElementById('session-role').value==='slave'`));
+    await new Promise(r=>setTimeout(r,150));publications=0;await new Promise(r=>setTimeout(r,220));if(publications)throw Error('Former Master kept publishing after role handoff');
+    published=null;send('role','master');send('status',{role:'master',peers:[],connected:false});await until(()=>published);
     await evalJs(`document.getElementById('session-stop').click();`);
-    console.log('Native bridge UI: Slave song selection, seek/play, loss pause, missing song, Master publication: OK');
-  }finally{win.destroy();for(const name of ['start','feedback','state'])ipcMain.removeHandler('test-session-'+name);}
+    info={...info,interfaces:[{name:'Ethernet',address:'192.168.10.99'}],recommendedAddress:'192.168.10.99'};
+    await until(()=>evalJs(`return !document.getElementById('session-refresh').disabled`));await evalJs(`document.getElementById('session-refresh').click();`);
+    await until(()=>evalJs(`return document.getElementById('session-interface').value==='192.168.10.99'`));
+    console.log('Native bridge UI: automatic IP, remote roles, confirmed blue/orange indicators, MIDI transport, loss and changed interfaces: OK');
+  }finally{win.destroy();for(const name of ['start','feedback','state','info','choose','handoff'])ipcMain.removeHandler('test-session-'+name);}
 };

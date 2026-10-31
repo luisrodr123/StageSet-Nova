@@ -8,14 +8,14 @@ async function evaluate(code){const result=await win.webContents.executeJavaScri
 async function run(){
   profile=await fs.mkdtemp(path.join(os.tmpdir(),'stageset-smoke-'));app.setPath('userData',profile);
   await app.whenReady();
-  session.defaultSession.setPermissionCheckHandler(()=>false);
-  session.defaultSession.setPermissionRequestHandler((_,__,done)=>done(false));
+  session.defaultSession.setPermissionCheckHandler((_,permission)=>permission==='fullscreen');
+  session.defaultSession.setPermissionRequestHandler((_,permission,done)=>done(permission==='fullscreen'));
   const testRoot=process.env.STAGESET_TEST_ROOT||path.resolve(__dirname,'..');
   const expectedVersion='v'+JSON.parse(await fs.readFile(path.join(testRoot,'package.json'),'utf8')).version.split('.').slice(0,2).join('.');
   const {createStageSetServer}=await import(pathToFileURL(path.join(testRoot,'server.mjs')).href);
   server=createStageSetServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  win=new BrowserWindow({show:false,width:1273,height:930,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});
-  win.webContents.setWindowOpenHandler(()=>({action:'allow',overrideBrowserWindowOptions:{show:false,width:1100,height:700,webPreferences:{backgroundThrottling:false}}}));
+  win=new BrowserWindow({show:false,width:1273,height:930,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,disableHtmlFullscreenWindowResize:true}});
+  win.webContents.setWindowOpenHandler(()=>({action:'allow',overrideBrowserWindowOptions:{show:false,width:1100,height:700,webPreferences:{backgroundThrottling:false,disableHtmlFullscreenWindowResize:true}}}));
   win.webContents.on('did-create-window',child=>children.push(child));
   win.webContents.on('console-message',event=>{if(event.level==='error'&&!/permission|MIDI|device|media|404/i.test(event.message))errors.push(event.message);});
   const url=`http://127.0.0.1:${server.address().port}/`;
@@ -87,6 +87,7 @@ async function run(){
   console.log('Editable mixer names, 5 pedals, CC/PC/Note/Song mapping and mosaic controls: OK');
   await require('./annotations.cjs')({win,mosaic,evaluate,children});
   await require('./backgrounds-ui.cjs')({win,mosaic,evaluate,children});
+  await require('./screens-ui.cjs')({win,mosaic,evaluate,children});
   await require('./session-ui.cjs')({url,children});
   const reloaded=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.reload();await reloaded;
   await evaluate(`for(let i=0;i<100&&!document.querySelector('.library-song');i++)await new Promise(resolve=>setTimeout(resolve,30));`);

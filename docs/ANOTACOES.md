@@ -1,9 +1,16 @@
-# Estado das anotações — StageSet 0.11.0
+# Estado das anotações — StageSet 0.13.0
 
 Este registo consolida os pedidos recebidos nesta conversa. O código das funções abaixo existe; a coluna de verificação distingue testes automáticos de ensaios físicos ainda necessários.
 
 | Pedido | Implementação / verificação |
 | --- | --- |
+| Menu transparente em todos os ecrãs de letras | Palco, saídas independentes e mosaico; opacidade e recolha automática guardadas por saída. |
+| Ecrã inteiro sem bordas | Painel ocupa o monitor atual; letras, desenho e controlos sobrepostos, editor dentro do fullscreen. Vários monitores físicos por validar. |
+| Editar letras no próprio ecrã | Editor local por saída, música fixada ao abrir o rascunho, bloqueio de conflitos e proteção Studio. |
+| Anotações tipo Paint | Caneta, cores, espessura, borracha, anular e limpar; gravação por música/saída e backup. |
+| Puxar letra sem alterar tempo principal | Roda, arrasto e botões consultam apenas esse ecrã; regresso ao foco atual após 5 segundos sem interação. |
+| IP local automático e atribuição remota Master/Slave | Interfaces detetadas, modo Disponível e transferência de comando; testes de protocolo e interface aprovados. |
+| Luz azul Master e laranja Slave | Só acendem com ligação confirmada; perda de sinal apaga a indicação. |
 | Fundo independente por monitor de letras | Cor sólida ou imagem, preencher/inteira/repetir e escurecimento. Janelas, mosaico, reabertura e backup testados. EPS convertido por Ghostscript externo no desktop. |
 | Detetar computadores StageSet e selecionar Slaves | Canal de controlo UDP multicast autenticado, seleção explícita e pausa por perda de sinal. Dois pares locais e interface testados; ensaio em dois PCs físicos pendente. Não é descoberta MIDI convencional. |
 | Entrar no Studio apenas com palavra-passe | Confirmada no teste de interface; confirmação apenas na criação. |

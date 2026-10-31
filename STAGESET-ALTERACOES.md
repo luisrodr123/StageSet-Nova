@@ -1,5 +1,35 @@
 # StageSet — alterações anotadas
 
+## 2026-10-31 — versão 0.13.0
+
+- Menu sobreposto no palco principal, nas janelas independentes e em cada painel do mosaico. Opacidade de 10% a 100%, recolha automática opcional, tamanho de letra e saída de vídeo nos controlos da janela. Preferências guardadas por saída e transportadas no backup do show.
+- Ecrã inteiro do painel de letras no monitor atual, sem barras da aplicação, moldura ou transporte. Controlos e editor permanecem dentro desse painel; botão de saída e Escape para regressar.
+- Consulta independente da letra completa com roda, arrasto do rato e botões anterior/seguinte. Não altera o áudio, a velocidade nem o transporte Master/Slave. Cinco segundos após a última interação regressa à frase sincronizada atual; botão para regressar imediatamente.
+- Edição das letras no próprio ecrã, incluindo em fullscreen. Guarda apenas a saída selecionada, mantendo os tempos. O rascunho fica associado à música em que foi aberto e conflitos com outra edição não o apagam. Respeita a proteção Studio/Live.
+- Anotações com caneta, cor, espessura, borracha, anular e limpar. Guarda cada traço por música e saída; posições proporcionais acompanham o redimensionamento do monitor. Desenhos fixos sobre o ecrã, incluídos no backup, distintos entre Palco/Banda/Público/etc.
+- Integra todos os ajustes de rede desenvolvidos como 0.12.0, descritos abaixo. Não houve distribuição intermédia 0.12.0.
+
+Verificação local aprovada: sintaxe/IDs/versões, 21 testes automáticos e suite Electron com perfil temporário. Confirmados: consulta isolada, reinício do prazo de 5 s, regresso ao foco atualizado sem deslocar o transporte, reabertura do menu com um clique, fullscreen HTML sem bordas, edição independente, conflito preservando rascunho, mudança de música sem trocar o destino da edição, caneta/borracha/anular, persistência/reabertura e backup. Capturas dos controlos e indicadores revistas. A permissão fullscreen foi ativada apenas para a origem local da aplicação desktop.
+
+Limites de ensaio: fullscreen HTML testado sem ocupar o monitor físico do utilizador; mudança entre vários monitores e utilização em dois PCs físicos requerem ensaio no equipamento do espetáculo. Ativação de fullscreen local a cada janela; não é enviada pelo Master da rede. Os desenhos ficam fixos sobre o ecrã, não ligados a palavras.
+
+
+## Versão 0.12.0 — incorporada na 0.13.0
+
+Conjunto de ajustes de rede incluído na distribuição 0.13.0.
+
+- Deteção das interfaces IPv4 locais, escolha automática de um IP existente e seletores com nome da placa/endereço para sessão Master/Slave e IP MIDI. Botão para atualizar interfaces após mudar a ligação de rede.
+- Modo Disponível e atribuição da função Slave a partir do Master, respeitando a opção de permitir atribuição remota.
+- Botão Passar comando (Master), com confirmação entre os computadores, encaminhamento dos Slaves selecionados e pausa durante a transferência.
+- Indicadores luminosos na barra principal e na lista: azul para Master ligado, laranja para Slave ligado e cinzento enquanto não existe ligação confirmada.
+- Mensagens e ações separadas para computadores detetados, ligação em curso, ligação confirmada, libertação e perda de sinal; instruções de configuração e ajuda para a rede.
+- Novos testes preparados para interfaces, atribuição remota, transferência com perda de mensagens e indicadores da interface.
+
+Verificação em 2026-10-31: testes de interfaces, protocolo, atribuição remota, transferência com mensagens perdidas e dois pares multicast locais aprovados. A suite Electron confirmou o IP automático, seleção remota, indicadores azul/laranja, transporte MIDI, perda de ligação e mudança de interface.
+
+O utilizador confirmou a ligação Master/Slave da 0.11 entre os seus PCs. Os novos ajustes de rede foram verificados localmente; a validação física desta versão em dois computadores continua pendente.
+
+
 ## 2026-10-30 — versão 0.11.0
 
 - Fundos independentes para palco principal e cada saída de letras: cor sólida ou wallpaper, preencher/imagem inteira/repetir padrão, escurecimento e pré-visualização. Botão Fundo junto de cada saída nas Configurações.

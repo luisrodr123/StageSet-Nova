@@ -3,12 +3,38 @@ import assert from 'node:assert/strict';
 import {SessionPeer,SessionNetwork} from '../desktop/session-link.cjs';
 const state={song:{id:'song',title:'Tema',fileName:'tema.wav'},playing:true,position:12.3,rate:1};
 function rig() {
-  const nodes=[],queue=[];let now=1000;
-  const add=(id,role,code='concert-123')=>{const p=new SessionPeer({id,name:id,version:'0.11.0',role,code,now:()=>now,send:data=>queue.push([p,data])});nodes.push(p);return p;};
-  const flush=()=>{let count=0;while(queue.length){if(++count>1000)throw Error('Packet storm');const [from,data]=queue.shift();nodes.filter(p=>p!==from).forEach(p=>p.receive(data,'127.0.0.1'));}};
+  const nodes=[],queue=[];let now=1000,drop=()=>false;
+  const add=(id,role,code='concert-123',options={})=>{const p=new SessionPeer({id,name:id,version:'0.12.0',role,code,...options,now:()=>now,send:data=>queue.push([p,data])});nodes.push(p);return p;};
+  const flush=()=>{let count=0;while(queue.length){if(++count>1000)throw Error('Packet storm');const [from,data]=queue.shift();if(drop(JSON.parse(JSON.parse(data.toString()).body)))continue;nodes.filter(p=>p!==from).forEach(p=>p.receive(data,'127.0.0.1'));}};
   const step=ms=>{now+=ms;nodes.forEach(p=>p.tick());flush();};
-  return {add,flush,step,advance:ms=>now+=ms};
+  return {add,flush,step,advance:ms=>now+=ms,setDrop:fn=>drop=fn};
 }
+test('remote Slave assignment, connected indicators require transport confirmation, and opt-out',()=>{
+  const r=rig(),m=r.add('master','master'),a=r.add('available','available'),locked=r.add('locked','available','concert-123',{allowRemote:false});r.step(0);m.setState(state);
+  assert.equal(m.snapshot().connected,false);assert.equal(a.snapshot().connected,false);
+  m.choose(a.id,true);r.flush();assert.equal(a.role,'slave');assert.equal(m.snapshot().connected,false);assert.equal(a.snapshot().connected,false);
+  r.step(100);assert.equal(m.snapshot().connected,true);assert.equal(a.snapshot().connected,true);assert.equal(a.snapshot().peers.find(p=>p.id===m.id).connected,true);
+  assert.throws(()=>m.choose(locked.id,true),/não permite/);assert.equal(locked.role,'available');
+  m.choose(a.id,false);r.flush();assert.equal(m.snapshot().connected,false);assert.equal(a.snapshot().connected,false);
+});
+test('Master handoff transfers the selected group, pauses role transitions and confirms exactly once',()=>{
+  const r=rig(),m=r.add('master','master'),s=r.add('candidate','slave'),f=r.add('follower','slave');r.step(0);m.setState(state);m.choose(s.id,true);m.choose(f.id,true);r.flush();r.step(100);
+  const roles=[];s.on('role',role=>roles.push(role));let lostDone=true;r.setDrop(packet=>{if(packet.type==='handoff-done'&&lostDone){lostDone=false;return true;}return false;});
+  m.handoff(s.id);r.flush();assert.equal(m.role,'slave');assert.equal(s.role,'master');assert.ok(m.transfer);assert.equal(m.selected.size,0);
+  s.setState({...state,playing:false});r.step(400);assert.equal(m.transfer,null);assert.deepEqual(roles,['master']);
+  r.step(100); // Followers acknowledge the claim before the next transport update confirms the link.
+  assert.equal(s.snapshot().connected,true);assert.equal(m.master?.id,s.id);assert.equal(f.master?.id,s.id);assert.equal(s.selected.size,2);
+});
+test('handoff with lost prepare/commit does not create competing Masters; competing claims cannot steal a busy Slave',()=>{
+  const r=rig(),m=r.add('master','master'),s=r.add('candidate','slave'),rival=r.add('rival','master');r.step(0);m.setState(state);m.choose(s.id,true);r.flush();r.step(100);
+  rival.handoff(s.id);r.flush();assert.equal(rival.transfer,null);assert.match(rival.notice,/recusada/);assert.equal(s.master.id,m.id);assert.equal(s.role,'slave');
+});
+test('handoff retries dropped commit; timeout before acceptance preserves existing Master',()=>{
+  const r=rig(),m=r.add('master','master'),s=r.add('candidate','available');r.step(0);m.setState(state);
+  r.setDrop(p=>p.type==='handoff-ready');m.handoff(s.id);r.flush();r.step(5100);assert.equal(m.role,'master');assert.equal(s.role,'available');assert.equal(m.transfer,null);
+  r.step(2000);r.setDrop(p=>p.type==='handoff-commit');m.setState(state);m.handoff(s.id);r.flush();assert.equal(m.role,'slave');assert.equal(s.role,'available');
+  r.setDrop(()=>false);r.step(400);assert.equal(s.role,'master');assert.equal(m.role,'slave');assert.equal(m.transfer,null);
+});
 test('discovery is session scoped; only selected Slave follows; release and competing Masters',()=>{
   const r=rig(),m=r.add('master','master'),s=r.add('slave','slave'),other=r.add('unselected','slave'),stranger=r.add('wrong-code','slave','wrong-secret'),rival=r.add('rival','master');
   r.step(0);assert.equal(m.peers.size,3);assert.equal(stranger.peers.size,0);

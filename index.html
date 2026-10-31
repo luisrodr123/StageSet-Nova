@@ -8,6 +8,7 @@
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <title>StageSet — palco</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./lyrics-screen.css" />
   </head>
   <body class="live-mode">
     <div class="app-shell">
@@ -36,7 +37,7 @@
           <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <span class="app-version" aria-label="Versão da aplicação">v0.11</span>
+          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.13</span>
         </div>
       </header>
 
@@ -414,25 +415,28 @@
             <p>IP MIDI multicast na aplicação desktop. As portas ficam disponíveis nos menus de entrada, saída e mixer. Outros programas Windows precisam de um driver IP MIDI próprio para aceder à rede.</p>
             <label class="settings-field">Grupo multicast<input id="ip-midi-group" value="225.0.0.37" /></label>
             <label class="settings-field">Primeira porta UDP<input id="ip-midi-port" type="number" min="1024" max="65526" value="21928" /></label>
-            <label class="settings-field">IP da interface local (opcional)<input id="ip-midi-interface" placeholder="Automática" /></label>
+            <label class="settings-field">Interface local<select id="ip-midi-interface"><option value="">A detetar IP local…</option></select></label>
             <button class="backup-button" id="ip-midi-start" type="button">Ligar 10 portas</button> <button class="backup-button" id="ip-midi-stop" type="button" disabled>Desligar portas</button>
             <p id="ip-midi-status" role="status">Desligado</p><ul id="ip-midi-list"></ul>
           </section>
-          <section class="settings-group">
+          <section class="settings-group" id="session-settings">
             <h3>Computadores StageSet · Master / Slave</h3>
-            <p>Ativa a sessão nos computadores que queres ligar, com o mesmo código. No Master, seleciona os Slaves. A descoberta usa UDP na rede local junto do IP MIDI; os ficheiros das músicas devem existir em cada computador.</p>
+            <ol class="session-steps"><li>Ativa a sessão em cada PC com o mesmo código.</li><li>No PC de comando, escolhe <strong>Master</strong>. Nos restantes, escolhe <strong>Disponível</strong>.</li><li>No Master, clica em <strong>Ligar como Slave</strong>. A luz acende quando a ligação fica confirmada.</li></ol>
             <fieldset id="session-options">
               <label class="settings-field">Nome deste computador<input id="session-name" maxlength="60" /></label>
-              <label class="settings-field">Modo<select id="session-role"><option value="master">Master · controlar outros computadores</option><option value="slave">Slave · aceitar um Master desta sessão</option></select></label>
-              <label class="settings-field">Código de sessão<input id="session-code" type="password" minlength="6" maxlength="64" autocomplete="off" placeholder="Igual nos computadores · mínimo 6 caracteres" /></label>
-              <label class="settings-field">Grupo de descoberta<input id="session-group" value="225.0.0.37" /></label>
-              <label class="settings-field">Porta UDP de descoberta<input id="session-port" type="number" min="1024" max="65535" value="21938" /></label>
-              <label class="settings-field">IP da interface local (opcional)<input id="session-interface" placeholder="Automática" /></label>
+              <label class="settings-field">Função neste computador<select id="session-role"><option value="available">Disponível · atribuir a partir do Master</option><option value="master">Master · controlar outros computadores</option><option value="slave">Slave · seguir um Master</option></select></label>
+              <label class="settings-field">Código de sessão<input id="session-code" type="password" minlength="6" maxlength="64" autocomplete="off" placeholder="O mesmo em todos os PCs · mínimo 6 caracteres" /></label>
+              <label class="settings-field">Interface e IP local<select id="session-interface"><option value="">A detetar IP local…</option></select></label>
+              <label class="session-permission"><input id="session-allow-remote" type="checkbox" checked> Permitir que o Master atribua a função à distância</label>
+              <details class="session-advanced"><summary>Rede avançada</summary><label class="settings-field">Grupo de descoberta<input id="session-group" value="225.0.0.37" /></label><label class="settings-field">Porta UDP<input id="session-port" type="number" min="1024" max="65535" value="21938" /></label></details>
             </fieldset>
-            <button class="connect-button" id="session-start" type="button">Ativar e procurar computadores</button>
-            <button class="backup-button" id="session-stop" type="button" disabled>Desligar / libertar Slave</button>
-            <p id="session-status" role="status">Desligado</p><ul id="session-peers"></ul>
-            <p>O Slave segue música, andamento, reprodução, pausa e posição; pára se perder o Master. Usa o backup de show para levar a mesma biblioteca a cada PC. MIDI convencional: configura a entrada/saída MTC abaixo; não identifica automaticamente computadores.</p>
+            <p id="session-interface-status" role="status">A detetar interfaces…</p>
+            <div class="settings-actions"><button class="connect-button" id="session-start" type="button" disabled>Ativar sessão e procurar</button><button class="backup-button" id="session-refresh" type="button">Atualizar interfaces</button><button class="backup-button" id="session-stop" type="button" disabled>Desligar sessão</button></div>
+            <div id="session-connection" class="session-connection" data-connected="false"><i class="session-led" aria-hidden="true"></i><strong class="session-label">Rede desligada</strong></div>
+            <p class="session-legend"><span><i class="session-led master-key" aria-hidden="true"></i> Azul: Master ligado</span><span><i class="session-led slave-key" aria-hidden="true"></i> Laranja: Slave ligado</span><span><i class="session-led" aria-hidden="true"></i> Cinzento: sem ligação</span></p>
+            <p id="session-status" role="status">Desligado</p><p id="session-empty" hidden>A procurar computadores… Confirma o mesmo código, rede e porta nos outros PCs e clica em Ativar sessão em cada um.</p><ul id="session-peers"></ul>
+            <p>Passar comando torna o computador escolhido Master e este PC Slave; os Slaves selecionados são encaminhados para o novo Master. A transferência pausa a reprodução. Usa 0.13 ou posterior em todos os PCs para atribuição remota.</p>
+            <details class="session-help"><summary>Não aparecem computadores ou a ligação não fica ativa?</summary><p>Seleciona a interface ligada à mesma rede nos dois PCs (Ethernet ou Wi-Fi). Confirma o código de sessão e permite StageSet na rede privada da firewall. Redes Wi-Fi de convidados podem impedir a descoberta. Leva a mesma biblioteca pelo backup do show para evitar músicas ausentes.</p></details>
           </section>
           <section class="settings-group"><h3>Sincronização SMPTE / MTC</h3>
             <fieldset id="sync-options"><label class="settings-field">Modo<select id="sync-mode"><option value="mtc-write">Emitir MTC</option><option value="mtc-read">Ler MTC</option><option value="ltc-write">Emitir SMPTE / LTC áudio</option><option value="ltc-read">Ler SMPTE / LTC áudio</option></select></label>
