@@ -26,20 +26,27 @@ jobs:
           node-version: '24'
       - run: chmod +x mobile/android/gradlew
       - run: mobile/android/gradlew -p mobile/android assembleDebug lintDebug
+      - name: Permitir aceleração no emulador do runner descartável
+        run: sudo chmod a+rw /dev/kvm
       - name: Testar ligação e letras em Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_tablet
+          disable-linux-hw-accel: false
           script: |
             node tests/mobile-server.cjs > mobile-server.log 2>&1 &
             adb reverse tcp:4186 tcp:4186
             mobile/android/gradlew -p mobile/android connectedDebugAndroidTest
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: StageSet-Host-Android-test
-          path: mobile/android/app/build/outputs/apk/debug/*.apk
+          path: |
+            mobile/android/app/build/outputs/apk/debug/*.apk
+            mobile/android/app/build/reports/androidTests
+            mobile/android/app/build/outputs/androidTest-results
   ios:
     runs-on: macos-latest
     timeout-minutes: 30

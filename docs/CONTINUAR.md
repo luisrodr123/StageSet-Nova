@@ -130,5 +130,13 @@ Repetir os comandos de validação e distribuição descritos no início deste g
 
 ## Versão 0.15: pastas e Host portátil
 
-Consultar [Shows e Host portátil](SHOWS-E-HOST-PORTATIL.md). show-project.js coordena gravação e interface; desktop/show-folder.cjs restringe escrita à pasta escolhida; zip-store.js cria ZIP padrão; desktop/host-main.cjs é o recetor dedicado e desktop/host-builder.cjs configura a compilação. A versão 0.14 não foi distribuída separadamente. Código 0.15 em validação final; consultar STAGESET-ALTERACOES.md antes de gerar uma release.
+Consultar [Shows e Host portátil](SHOWS-E-HOST-PORTATIL.md). show-project.js coordena gravação e interface; desktop/show-folder.cjs restringe escrita à pasta escolhida; zip-store.js cria ZIP padrão; desktop/host-main.cjs é o recetor dedicado e desktop/host-builder.cjs configura a compilação. A versão 0.14 não foi distribuída separadamente.
+
+## Versão 0.16: arranque do Host e dispositivos móveis
+
+O lançador Host usa `portable.useZip: true`, após reproduzir saída com código 2 antes da janela no EXE 0.15. Não basta testar o ASAR: executar `npm run dist:host` e `npm run test:host:portable`; este último abre o EXE real com perfil temporário e verifica a janela e receção. O perfil Host é separado (`stageset-host`). Não alterar o perfil `stage-set` da aplicação principal.
+
+Android nativo em `mobile/android`, iPhone/iPad em `mobile/ios`; ambos reutilizam o recetor servido pelo StageSet. Build Android: JDK 17/SDK 35/Gradle Wrapper; build iOS: XcodeGen/Xcode no Mac. Ver [guia móvel](HOST-ANDROID-IOS.md). A versão é lida de package.json no Android e sincronizada por `npm run bump` no iOS. A PWA usa `host-sw.js`, também versionado pelo bump.
+
+`node scripts/package-mobile.mjs` reúne o APK local de teste e um ZIP do projeto iOS sem chaves. `node scripts/checksums.mjs --mobile` inclui os cinco artefactos; `node scripts/release.mjs` publica nos dois repositórios. O workflow Host Android e iPad compila e testa em emulador/simulador. Instalação física iOS exige assinatura do proprietário; não apresentar o projeto ou app de simulador como IPA pronto.
 

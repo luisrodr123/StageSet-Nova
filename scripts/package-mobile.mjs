@@ -1,0 +1,10 @@
+import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
+import {createZip} from '../zip-store.js';
+const {version}=JSON.parse(await readFile('package.json','utf8'));
+await mkdir('dist/mobile',{recursive:true});
+await copyFile('mobile/android/app/build/outputs/apk/debug/app-debug.apk',`dist/mobile/StageSet-Host-${version}-Android-Test.apk`);
+const files=['project.yml','StageSetHost/Info.plist','StageSetHost/StageSetHostApp.swift','StageSetHostUITests/HostTests.swift'];
+const entries=await Promise.all(files.map(async name=>({name,blob:new Blob([await readFile('mobile/ios/'+name)])})));
+entries.push({name:'HOST-ANDROID-IOS.md',blob:new Blob([await readFile('docs/HOST-ANDROID-IOS.md')])});
+const archive=await createZip(entries);await writeFile(`dist/mobile/StageSet-Host-${version}-iOS-Project.zip`,new Uint8Array(await archive.arrayBuffer()));
+console.log(`Android test APK and iPhone/iPad source project ${version}: dist/mobile`);

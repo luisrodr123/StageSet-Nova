@@ -24,7 +24,7 @@ import static org.junit.Assert.*;
     private String js(WebView web,String script) throws Exception {
         AtomicReference<String> result=new AtomicReference<>();CountDownLatch done=new CountDownLatch(1);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->web.evaluateJavascript(script,value->{result.set(value);done.countDown();}));
-        assertTrue(done.await(10,TimeUnit.SECONDS));return result.get();
+        assertTrue("WebView callback timed out: "+script,done.await(30,TimeUnit.SECONDS));return result.get();
     }
     private void waitJS(WebView web,String script) throws Exception {for(int i=0;i<100;i++){if("true".equals(js(web,script)))return;Thread.sleep(150);}fail("Timeout: "+script);}
     @Test public void receivesLyricsAndReturnsHome() throws Exception {

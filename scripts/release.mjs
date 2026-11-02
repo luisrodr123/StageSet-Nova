@@ -19,7 +19,7 @@ async function api(url,options={}){
   return response.status===204?{}:response.json();
 }
 const user=await api('https://api.github.com/user');if(user?.login!=='luisrodr123')throw new Error('A conta Git autenticada não corresponde ao proprietário dos repositórios.');
-const filenames=[`dist/StageSet-${version}-Portable-x64.exe`,`dist/StageSet-${version}-Setup-x64.exe`,`dist/host/StageSet-Host-${version}-Portable-x64.exe`,'dist/SHA256SUMS.txt','STAGESET-ALTERACOES.md','docs/HOST-E-EVENTOS.md','docs/SHOWS-E-HOST-PORTATIL.md','scripts/host-certificate.ps1'];
+const filenames=[`dist/StageSet-${version}-Portable-x64.exe`,`dist/StageSet-${version}-Setup-x64.exe`,`dist/host/StageSet-Host-${version}-Portable-x64.exe`,`dist/mobile/StageSet-Host-${version}-Android-Test.apk`,`dist/mobile/StageSet-Host-${version}-iOS-Project.zip`,'dist/SHA256SUMS.txt','STAGESET-ALTERACOES.md','docs/HOST-E-EVENTOS.md','docs/SHOWS-E-HOST-PORTATIL.md','docs/HOST-ANDROID-IOS.md','scripts/host-certificate.ps1'];
 for(const file of filenames)await stat(file);
 const body=await readFile(`docs/RELEASE-${version.split('.').slice(0,2).join('.')}.md`,'utf8');
 for(const repo of repos){
@@ -32,7 +32,7 @@ for(const repo of repos){
     const existing=release.assets?.find(asset=>asset.name===name);
     if(existing){if(existing.digest!==digest)throw new Error(`Já existe um artefacto diferente: ${repo}/${name}`);continue;}
     const url=new URL(release.upload_url.replace(/\{.*$/,''));url.searchParams.set('name',name);
-    await api(url.href,{method:'POST',headers:{'Content-Type':name.endsWith('.exe')?'application/octet-stream':'text/plain'},body:data});
+    await api(url.href,{method:'POST',headers:{'Content-Type':/\.(exe|apk|zip)$/.test(name)?'application/octet-stream':'text/plain'},body:data});
     console.log(`Carregado ${repo}: ${name}`);
   }
   release=await api(`${base}/releases/${release.id}`,{method:'PATCH',body:JSON.stringify({body,draft:false,prerelease:true})});
