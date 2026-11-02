@@ -1,5 +1,22 @@
 # StageSet — alterações anotadas
 
+## Versão 0.15.0 — em desenvolvimento
+
+Registar aqui as alterações, testes e limitações antes de distribuir.
+
+
+## Versão 0.14.0 — em desenvolvimento
+
+- Traços novos associados às linhas das letras: acompanham o scroll, foco e redimensionamento. Notas antigas preservadas com opção explícita de as fixar às linhas visíveis.
+- Exportação PDF por saída: letra completa e anotações, páginas A4 e nome da música/janela. PDF visual rasterizado, sem texto pesquisável.
+- Menu Inserir com botão direito no editor principal e no editor de cada janela: MIDI, imagem, vídeo e DMX, com campos próprios, tempo de execução e dimensões para multimédia.
+- SL04: saída Art-Net pela interface USB de rede que a caixa disponibiliza, IP configurável, quatro universos, canais/valores, transições e blackout. Não utiliza nem altera os modos proprietários da caixa.
+- StageSet Host web: recetores com código de sessão, presença automática após ligação e atribuição de saída no StageSet. Recebe letras, desenhos, fundos e multimédia; não recebe autorização para controlar o transporte.
+- Manifesto e ícones para instalação web nos cinco sistemas pedidos. HTTP para teste no browser; HTTPS com certificado PFX e confiança no dispositivo para instalação. Script de criação de certificados locais, sem instalar confiança automaticamente.
+
+Validação em curso. 24 testes de protocolo/backup aprovados, incluindo receção ArtDmx real em loopback e autenticação/isolamento dos recetores. Faltam concluir os testes visuais das novidades, empacotamento e publicação. A SL04 física e os cinco sistemas não foram testados neste computador.
+
+
 ## 2026-10-31 — versão 0.13.0
 
 - Menu sobreposto no palco principal, nas janelas independentes e em cada painel do mosaico. Opacidade de 10% a 100%, recolha automática opcional, tamanho de letra e saída de vídeo nos controlos da janela. Preferências guardadas por saída e transportadas no backup do show.

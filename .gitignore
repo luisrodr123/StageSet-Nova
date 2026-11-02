@@ -18,3 +18,6 @@ desktop.ini
 *.midi
 *.cdg
 *.pdf
+*.pfx
+*.p12
+*.key

@@ -1,3 +1,4 @@
+import {validateEvent} from './lyric-events.js';
 const MAGIC = "SSTBK001";
 const PREFIX_SIZE = 12;
 const MAX_HEADER_SIZE = 32 * 1024 * 1024;
@@ -14,7 +15,7 @@ export function createBackup(songs, preferences) {
   const payloads = [];
   let payloadSize = 0;
   const backedSongs = songs.map((song) => {
-    const { audioBlob, midiBlob, cdgBlob, audioStems = [], ...metadata } = song;
+    const { audioBlob, midiBlob, cdgBlob, audioStems = [], lyricEvents = [], ...metadata } = song;
     const audio = asAsset(audioBlob, payloadSize);
     if (!audio) throw new Error("A faixa “" + song.title + "” não tem áudio ou documento guardado.");
     payloads.push(audio.blob);
@@ -37,7 +38,13 @@ export function createBackup(songs, preferences) {
       const { blob, ...stemMetadata } = stem;
       return { ...stemMetadata, assetKey: key };
     });
-    return { ...metadata, audioStems: backedStems, assets };
+    const backedEvents=lyricEvents.map((item,index)=>{
+      const event=validateEvent(item);if(!event.data)return event;
+      const [prefix,encoded]=event.data.split(','),type=prefix.slice(5,-7),bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      const key='event'+index,asset=asAsset(new Blob([bytes],{type}),payloadSize);assets[key]=asset.descriptor;payloads.push(asset.blob);payloadSize+=asset.blob.size;
+      const {data,...definition}=event;return {...definition,assetKey:key};
+    });
+    return { ...metadata, audioStems: backedStems, lyricEvents:backedEvents, assets };
   });
   if (payloadSize + PREFIX_SIZE > MAX_BACKUP_SIZE) throw new Error("A cópia de segurança excede 4 GB.");
 
@@ -107,7 +114,7 @@ export async function readBackup(file) {
   const payloadOffset = PREFIX_SIZE + headerSize;
   const ids = new Set();
   const ranges = [];
-  const songs = manifest.songs.map((entry) => {
+  const songs = await Promise.all(manifest.songs.map(async (entry) => {
     if (!entry || typeof entry.id !== "string" || !entry.id || ids.has(entry.id) ||
         typeof entry.title !== "string" || typeof entry.fileName !== "string") {
       throw new Error("A cópia contém dados de faixa inválidos ou repetidos.");
@@ -142,8 +149,21 @@ export async function readBackup(file) {
       }
       return restored;
     });
+    if(entry.lyricEvents!==undefined){
+      if(!Array.isArray(entry.lyricEvents)||entry.lyricEvents.length>256)throw Error('Eventos de letras inválidos.');
+      song.lyricEvents=await Promise.all(entry.lyricEvents.map(async item=>{
+        const event={...item};
+        if(event.assetKey){
+          const asset=readAsset(file,assets[event.assetKey],payloadOffset);if(asset.blob.size>8*1024*1024)throw Error('Multimédia demasiado grande.');ranges.push(asset.range);
+          const bytes=new Uint8Array(await asset.blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
+          event.data='data:'+asset.blob.type+';base64,'+btoa(binary);delete event.assetKey;
+        }
+        return validateEvent(event);
+      }));
+      if(song.lyricEvents.reduce((n,e)=>n+(e.data?.length||0),0)>20000000)throw Error('Multimédia da música excede 20 MB.');
+    }
     return song;
-  });
+  }));
   ranges.sort((a, b) => a[0] - b[0]);
   for (let i = 1; i < ranges.length; i++) {
     if (ranges[i][0] < ranges[i - 1][1]) throw new Error("A cópia contém ficheiros sobrepostos.");

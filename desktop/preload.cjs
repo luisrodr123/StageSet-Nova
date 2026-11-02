@@ -1,6 +1,17 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("stageSetDesktop", {
+  showInfo:()=>ipcRenderer.invoke('show:info'),showCreate:(name,previous)=>ipcRenderer.invoke('show:create',name,previous),showOpen:()=>ipcRenderer.invoke('show:open'),showSave:snapshot=>ipcRenderer.invoke('show:save',snapshot),showZip:()=>ipcRenderer.invoke('show:zip'),showDetach:()=>ipcRenderer.invoke('show:detach'),
+  hostStart: config=>ipcRenderer.invoke('host:start',config),
+  hostStop: ()=>ipcRenderer.invoke('host:stop'),
+  hostClients: ()=>ipcRenderer.invoke('host:clients'),
+  hostAssign: (id,output)=>ipcRenderer.invoke('host:assign',id,output),
+  hostPublish: (id,frame)=>ipcRenderer.invoke('host:publish',id,frame),
+  hostCertificate: ()=>ipcRenderer.invoke('host:certificate'),
+  dmxStart: config=>ipcRenderer.invoke('dmx:start',config),
+  dmxStop: ()=>ipcRenderer.invoke('dmx:stop'),
+  dmxCue: event=>ipcRenderer.invoke('dmx:cue',event),
+  dmxBlackout: ()=>ipcRenderer.invoke('dmx:blackout'),
   convertEps: data => ipcRenderer.invoke('background:eps',data),
   sessionInfo: () => ipcRenderer.invoke('session:info'),
   startSession: config => ipcRenderer.invoke('session:start',config),

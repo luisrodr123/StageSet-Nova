@@ -1,4 +1,7 @@
 import {screenPreferences, validateDrawing} from './screen-data.js';
+import {inkRows,anchorPoint,paintInk} from './lyric-ink.js';
+import {exportLyricsPdf} from './lyrics-pdf.js';
+import {attachEventInserter,hydrateEvents} from './lyric-events.js';
 
 // Requests are scoped to the opener and its origin, never to arbitrary windows.
 export function screenClient(output) {
@@ -25,6 +28,7 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
       <div class="screen-row"><button type="button" data-screen="back" title="Consultar linhas anteriores, sem deslocar o áudio">↑ Anterior</button><button type="button" data-screen="forward" title="Consultar linhas seguintes, sem deslocar o áudio">↓ Seguinte</button><button type="button" data-screen="focus">Voltar ao foco</button></div>
       <div class="screen-row"><button type="button" data-screen="fullscreen">⛶ Ecrã inteiro</button><button type="button" data-screen="edit">Editar letras</button><button type="button" data-screen="paint" aria-pressed="false">✎ Desenhar</button></div>
       <div class="screen-row screen-brushes" hidden><label>Cor <input type="color" data-screen="color" value="#ffdb4d"></label><label>Traço <input type="range" data-screen="width" min="2" max="30" value="5"></label><button type="button" data-screen="eraser" aria-pressed="false">Borracha</button><button type="button" data-screen="undo">Anular</button><button type="button" data-screen="clear">Limpar</button></div>
+      <div class="screen-row"><button type="button" data-screen="pdf">Exportar PDF</button><button type="button" data-screen="anchor">Fixar notas antigas às linhas visíveis</button></div>
       <div class="screen-extra screen-row"></div>
       <div class="screen-row"><label>Opacidade <input type="range" data-screen="opacity" min="10" max="100" step="5" value="65"><output data-screen="opacity-value">65%</output></label><label><input type="checkbox" data-screen="autohide" checked> Recolher menu</label></div>
       <small>Roda ou arrasta a letra. Após 5 s sem interação, regressa ao foco.</small>
@@ -84,17 +88,16 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
     try {if(document.fullscreenElement===host)await document.exitFullscreen();else if(host.requestFullscreen)await host.requestFullscreen({navigationUI:'hide'});else throw Error('Ecrã inteiro indisponível neste browser.');}catch(error){message(error.message);}
   }
   el('fullscreen').onclick=fullscreen;
+  el('pdf').onclick=async()=>{try{await exportLyricsPdf(viewport,strokes,(context.title||'Letras')+' - '+(context.name||'Palco principal'));message('PDF exportado com letras e anotações.');}catch(error){message(error.message);}};
+  el('anchor').onclick=()=>{const r=canvas.getBoundingClientRect(),rows=inkRows(viewport);if(!rows.length)return;strokes=strokes.map(s=>s.anchors?s:{...s,lineWidth:Math.min(2,s.width*Math.min(r.width,r.height)/Math.max(1,rows[0].rect.height)),anchors:s.points.map(([x,y])=>anchorPoint(rows,r.left+x*r.width,r.top+y*r.height))});changedDrawing();};
   const fullscreenChanged=()=>{el('fullscreen').textContent=document.fullscreenElement===host?'⛶ Sair de ecrã inteiro':'⛶ Ecrã inteiro';resize();};
   document.addEventListener('fullscreenchange',fullscreenChanged);
   function redraw() {
     const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);
-    for(const item of [...strokes,...(stroke?[stroke]:[])]) {
-      ctx.globalCompositeOperation=item.tool==='eraser'?'destination-out':'source-over';ctx.strokeStyle=item.color;ctx.fillStyle=item.color;ctx.lineWidth=item.width*Math.min(w,h);ctx.lineCap='round';ctx.lineJoin='round';
-      ctx.beginPath();item.points.forEach(([x,y],i)=>{if(i)ctx.lineTo(x*w,y*h);else ctx.moveTo(x*w,y*h);});
-      if(item.points.length===1){const [x,y]=item.points[0];ctx.arc(x*w,y*h,ctx.lineWidth/2,0,Math.PI*2);ctx.fill();}else ctx.stroke();
-    }
-    ctx.globalCompositeOperation='source-over';
+    const rect=canvas.getBoundingClientRect();if(rect.width)paintInk(ctx,[...strokes,...(stroke?[stroke]:[])],inkRows(viewport),rect,w/rect.width);
+    el('anchor').hidden=!strokes.some(s=>!s.anchors);
   }
+  viewport.addEventListener('scroll',redraw,{passive:true});
   function resize() {
     const r=host.getBoundingClientRect(),ratio=Math.min(2,devicePixelRatio||1);canvas.width=Math.max(1,Math.round(r.width*ratio));canvas.height=Math.max(1,Math.round(r.height*ratio));
     viewport.style.setProperty('--screen-pad',Math.max(0,viewport.clientHeight/2-30)+'px');redraw();
@@ -102,7 +105,7 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
   }
   let resizeFrame;
   const observer=new ResizeObserver(()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});observer.observe(host);
-  function drawingButtons() {for(const name of ['undo','clear'])el(name).disabled=!strokes.length||loadingNotes||saving;el('paint').disabled=!key()||loadingNotes;el('retry').hidden=!dirty||saving;}
+  function drawingButtons() {for(const name of ['undo','clear'])el(name).disabled=!!context.readOnly||!strokes.length||loadingNotes||saving;el('paint').disabled=!!context.readOnly||!key()||loadingNotes;el('anchor').disabled=!!context.readOnly;el('retry').hidden=!dirty||saving;}
   function setPaint(value) {paint=value;host.dataset.paint=String(value);el('paint').setAttribute('aria-pressed',String(value));toolbar.querySelector('.screen-brushes').hidden=!value;wake();}
   el('paint').onclick=()=>setPaint(!paint);
   el('eraser').onclick=()=>{eraser=!eraser;el('eraser').setAttribute('aria-pressed',String(eraser));};
@@ -124,9 +127,10 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
     if(event.button!==0||!paint||!key()||loadingNotes||saving||stroke)return;
     if(strokes.length>=200){message('Máximo de 200 traços. Anula ou limpa o desenho.');return;}
     event.preventDefault();canvas.setPointerCapture(event.pointerId);
-    stroke={tool:eraser?'eraser':'pen',color:el('color').value,width:Number(el('width').value)/1000,points:[point(event)]};redraw();
+    const rows=inkRows(viewport),anchor=anchorPoint(rows,event.clientX,event.clientY);if(!anchor)return;
+    stroke={tool:eraser?'eraser':'pen',color:el('color').value,width:Number(el('width').value)/1000,points:[point(event)],lineWidth:Math.min(2,Number(el('width').value)/Math.max(1,rows[anchor.line].rect.height)),anchors:[anchor]};redraw();
   });
-  canvas.addEventListener('pointermove',event=>{if(!stroke)return;if(stroke.points.length<2000)stroke.points.push(point(event));redraw();});
+  canvas.addEventListener('pointermove',event=>{if(!stroke)return;if(stroke.points.length<2000){stroke.points.push(point(event));stroke.anchors.push(anchorPoint(inkRows(viewport),event.clientX,event.clientY));}redraw();});
   function finishStroke(){if(!stroke)return;strokes=[...strokes,stroke];stroke=null;changedDrawing();}
   canvas.addEventListener('pointerup',finishStroke);canvas.addEventListener('pointercancel',finishStroke);
   async function loadDrawing() {
@@ -152,15 +156,18 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
     catch(error){editor.querySelector('.screen-edit-status').textContent=error.message;}
     finally{save.disabled=false;editingBusy=false;}
   };
+  attachEventInserter(editor.querySelector('textarea'),{root:editor,context:()=>draft&&({...draft,position:context.position}),save:(ctx,event)=>request('event-save',{songId:ctx.songId,event})});
   function update(data) {
     const changed=context.songId!==data.songId;context=data;
     if(changed){generation++;manualUntil=0;clearTimeout(focusTimer);lastFocus=null;stroke=null;strokes=[];revision=0;dirty=false;saving=false;loadingNotes=false;setPaint(false);redraw();void loadDrawing();}
     else if(key()&&!dirty&&!saving&&!loadingNotes&&Number(data.annotationVersion||0)!==revision)void loadDrawing();
     const nextPrefs=screenPreferences(data.overlay);if(!prefsDirty&&JSON.stringify(nextPrefs)!==JSON.stringify(prefs))setPrefs(nextPrefs);
     el('edit').disabled=!key()||!data.canEdit;el('edit').title=data.canEdit?'Editar apenas as letras desta saída':'Entra no Studio no computador principal para editar';drawingButtons();
+    if(data.readOnly){el('paint').disabled=true;el('anchor').disabled=true;}
     const line=currentLine(),focusId=line?.dataset.sourceIndex||[...viewport.children].indexOf(line);
     if(manualUntil>performance.now())viewport.scrollTop=manualTop;
     else if(line!==lastFocus||focusId!==host.dataset.focus){centerFocus();host.dataset.focus=String(focusId);lastFocus=line;host.dataset.manual='false';}
+    redraw();
   }
   setPrefs(prefs);
   return {update,fullscreen,focus,destroy(){observer.disconnect();cancelAnimationFrame(resizeFrame);clearTimeout(focusTimer);clearTimeout(idleTimer);document.removeEventListener('fullscreenchange',fullscreenChanged);toolbar.remove();canvas.remove();editor.remove();}};
@@ -174,4 +181,6 @@ export function renderScreenLines(viewport, data) {
     viewport.replaceChildren(...data.lines.map((text,index)=>{const p=document.createElement('p');p.className='line'+(text?'':' blank');p.innerHTML=data.htmlLines[index];p.style.color=data.baseColor;p.style.fontSize=data.fontSize+'px';return p;}));
   }
   [...viewport.children].forEach((p,index)=>{p.classList.toggle('current',index===data.currentIndex);p.style.background=index===data.currentIndex?data.color+'55':'';});
+  if(data.events)viewport._lyricEvents=data.events;
+  hydrateEvents(viewport,viewport._lyricEvents||[],data.position,data.playing);
 }

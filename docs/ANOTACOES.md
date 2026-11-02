@@ -1,9 +1,14 @@
-# Estado das anotações — StageSet 0.13.0
+# Estado das anotações — StageSet 0.14.0
 
 Este registo consolida os pedidos recebidos nesta conversa. O código das funções abaixo existe; a coluna de verificação distingue testes automáticos de ensaios físicos ainda necessários.
 
 | Pedido | Implementação / verificação |
 | --- | --- |
+| Paint acompanha as letras | Novos traços ligados às linhas; scroll, foco, fontes e persistência testados. Migração explícita para desenhos antigos fixos. |
+| PDF por janela com letra e anotações | Exportação A4 multipágina rasterizada, nome da música/saída; PDF de três páginas renderizado e revisto. |
+| Botão direito → Inserir MIDI, imagem, vídeo e DMX | Ambos os editores, campos por tipo, tempo, dimensões e anexos no backup; importação/descodificação e encaminhamento DMX temporal testados. |
+| Interface SL04 USB | ArtDmx unicast pela placa de rede USB/LAN, quatro universos e transições; pacotes/blackout testados em loopback. Caixa física ainda por validar. |
+| App Host nos cinco sistemas | Recetor web instalável com HTTPS, código, presença e atribuição de saída. Testes de rede/HTTPS/interface móvel locais; cinco sistemas físicos não ensaiados. |
 | Menu transparente em todos os ecrãs de letras | Palco, saídas independentes e mosaico; opacidade e recolha automática guardadas por saída. |
 | Ecrã inteiro sem bordas | Painel ocupa o monitor atual; letras, desenho e controlos sobrepostos, editor dentro do fullscreen. Vários monitores físicos por validar. |
 | Editar letras no próprio ecrã | Editor local por saída, música fixada ao abrir o rascunho, bloqueio de conflitos e proteção Studio. |

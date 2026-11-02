@@ -7,6 +7,9 @@ const { IpMidi } = require('./ip-midi.cjs');
 const ipMidi = new IpMidi();
 const { SessionNetwork } = require('./session-link.cjs');
 const sessionLink = new SessionNetwork();
+const dmx=new (require('./dmx.cjs').DmxOutput)();
+const hostServer=new (require('./host-server.cjs').HostServer)();let hostPfx;
+let showFolder;
 
 const desktopPort = 4178;
 const localUrl = `http://127.0.0.1:${desktopPort}`;
@@ -22,6 +25,11 @@ if (!hasSingleInstance) {
   app.quit();
 } else {
   const trusted = event => event.sender === mainWindow?.webContents && new URL(event.sender.getURL()).origin === localUrl;
+  const folder=()=>showFolder??=new (require('./show-folder.cjs').ShowFolder)(path.join(app.getPath('userData'),'active-show.json'));
+  for(const [name,fn] of Object.entries({info:()=>folder().info(),save:s=>folder().save(s),detach:async()=>{await folder().queue;folder().root=null;await fs.writeFile(folder().config,'{}');},create:async(name,previous)=>{const choice=await dialog.showOpenDialog(mainWindow,{title:'Escolher pasta onde criar o novo show',properties:['openDirectory','createDirectory']});if(choice.canceled)return null;return folder().create(choice.filePaths[0],name,previous);},open:async()=>{const choice=await dialog.showOpenDialog(mainWindow,{title:'Abrir pasta de show StageSet',properties:['openDirectory']});if(choice.canceled)return null;return folder().open(choice.filePaths[0]);},zip:async()=>{const choice=await dialog.showSaveDialog(mainWindow,{title:'Exportar pasta do show em ZIP',defaultPath:'StageSet-show.zip',filters:[{name:'Arquivo ZIP',extensions:['zip']}]});if(choice.canceled)return null;return folder().zip(choice.filePath);}}))ipcMain.handle('show:'+name,(event,...args)=>{if(!trusted(event))throw Error('Janela não autorizada.');return fn(...args);});
+  ipcMain.handle('host:certificate',async event=>{if(!trusted(event))throw Error('Janela não autorizada.');const choice=await dialog.showOpenDialog(mainWindow,{title:'Certificado HTTPS para os recetores',properties:['openFile'],filters:[{name:'Certificado PFX',extensions:['pfx','p12']}]});if(choice.canceled)return false;hostPfx=await fs.readFile(choice.filePaths[0]);if(hostPfx.length>1048576){hostPfx=null;throw Error('Certificado demasiado grande.');}return true;});
+  for(const [name,fn] of Object.entries({start:config=>hostServer.start({...config,pfx:config.tls?hostPfx:null},path.join(__dirname,'..')),stop:()=>hostServer.stop(),clients:()=>hostServer.list(),assign:(id,output)=>hostServer.assign(id,output),publish:(id,frame)=>hostServer.publish(id,frame)}))ipcMain.handle('host:'+name,(event,...args)=>{if(!trusted(event))throw Error('Janela não autorizada.');return fn(...args);});
+  for(const [name,fn] of Object.entries({start:config=>dmx.start(config),stop:()=>dmx.stop(),cue:event=>dmx.cue(event),blackout:()=>dmx.blackout()}))ipcMain.handle('dmx:'+name,(event,...args)=>{if(!trusted(event))throw Error('Janela não autorizada.');return fn(...args);});
   ipcMain.handle('background:eps', (event, data) => { if(!trusted(event))throw Error('Janela não autorizada.');return require('./background-image.cjs').convertEps(data); });
   const sessionHandlers = {
     info: async () => ({name:require('node:os').hostname(),version:app.getVersion(),...await require('./network-interfaces.cjs').networkInfo()}),
@@ -141,6 +149,8 @@ function createWindow() {
 }
 
 app.on("before-quit", () => {
+  dmx.stop();
+  void hostServer.stop();
   sessionLink.stop();
   ipMidi.stop();
   if (server?.listening) server.close();

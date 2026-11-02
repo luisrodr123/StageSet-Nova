@@ -3,12 +3,16 @@ import { CdgDecoder } from "./cdg.js";
 import { isDocumentSong, readDocumentText } from "./documents.js";
 import { extractMp3CdgPairs, extractAudioStems } from "./zip-import.js";
 import { createBackup, readBackup } from "./backup.js";
+import {setupShowProject,showFiles} from './show-project.js';
+let showProject;
 import { NetworkMidi } from './network-midi.js';
 import { setupSync } from './sync.js';
 import { setupSession } from './session-ui.js';
 import { normalizeBackground, applyBackground, setupBackgroundEditor } from './backgrounds.js';
 import { createLyricsScreen } from './lyrics-screen.js';
 import { screenPreferences, validateDrawing } from './screen-data.js';
+import {validateEvent,eventMidiBytes,eventMarkup,hydrateEvents,attachEventInserter,withEventRows} from './lyric-events.js';
+import {setupHostSettings} from './host-settings.js';
 let mainLyricsScreen;
 
 if ("serviceWorker" in navigator && (location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
@@ -58,6 +62,8 @@ let syncController;
 let sessionController;
 let backgroundEditor;
 const sentBackgrounds = new WeakMap();
+const sentEvents=new WeakMap();
+let hostPublisher;
 function mainBackground() { try{return normalizeBackground(JSON.parse(localStorage.getItem('stageset-main-background')||'{}'));}catch{return normalizeBackground();} }
 const networkMidi = new NetworkMidi((event,id)=>syncController?.receiveMidi(event,id), error=>{
   renderMidiInputs();renderMidiOutputs();syncController?.refreshPorts();
@@ -1061,8 +1067,8 @@ async function withStore(mode, action) {
 }
 
 const dbGetAll = () => withStore("readonly", (store) => store.getAll());
-const dbPut = (song) => withStore("readwrite", (store) => store.put(song));
-const dbDelete = (id) => withStore("readwrite", (store) => store.delete(id));
+const dbPut = async (song) => {await withStore("readwrite", (store) => store.put(song));showProject?.changed();};
+const dbDelete = async (id) => {await withStore("readwrite", (store) => store.delete(id));showProject?.changed();};
 
 async function dbReplaceAll(songs) {
   const db = await openDatabase();
@@ -1151,7 +1157,7 @@ function coloredLyricHtml(text) {
   }
   html += escapeHtml(source.slice(cursor));
   while (open-- > 0) html += "</span>";
-  return html;
+  return eventMarkup(html);
 }
 
 function appendColoredLyricText(element, text) {
@@ -1228,7 +1234,7 @@ function outputLyricFrame(song, output, fallback, fallbackIndex, timestamps = fa
   const raw = song ? editorLyricsFor(song, output.id) : '';
   if (!raw && !Object.hasOwn(song?.lyricOutputLyrics ?? {}, output.id)) return { lines: fallback.map(line => timestamps ? line : line.replace(/\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*/g, '')), currentIndex: fallbackIndex };
   const parsed = parseLyrics(raw || '');
-  const timed = parsed.timeLines.length ? parsed.timeLines : midiData?.barBeatToSeconds ? parsed.barBeatLines.map(line => ({...line, time:midiData.barBeatToSeconds(line.bar,line.beat)})) : [];
+  const timed = withEventRows(raw,parsed.timeLines.length ? parsed.timeLines : midiData?.barBeatToSeconds ? parsed.barBeatLines.map(line => ({...line, time:midiData.barBeatToSeconds(line.bar,line.beat)})) : [],song?.lyricEvents);
   const source = (raw || '').split(/\r?\n/);
   const all = timed.length ? timed.map(line => timestamps ? source[line.sourceIndex] : line.text) : source.filter(line => !isEmbeddedMidiTag(line));
   const active = timed.length ? timed.reduce((found,line,index) => line.time <= currentPosition() ? index : found, -1) : state.autoScroll && currentDuration() ? Math.min(all.length-1, Math.floor(currentPosition()/currentDuration()*all.length)) : Math.min(all.length-1,state.manualLyricOffset);
@@ -1241,13 +1247,15 @@ function broadcastLyricWindows(lines, currentIndex = -1) {
   state.displayOutputs.forEach((output,index) => {
     const prefs = lyricOutputSettings(song,output.id);
     const common = {...screenContext(song,output.id),displays:availableDisplays,desktop:!!window.stageSetDesktop,displayId:output.displayId||'',output:output.id,name:output.name,color:prefs.highlightColor||output.color,baseColor:output.color,fontSize:Number(prefs.fontSize)||42,visible:output.mosaicVisible!==false};
+    if(hostPublisher?.active){const frame=outputLyricFrame(song,output,lines,currentIndex,false);hostPublisher.publish(output.id,{...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),background:output.background,events:song?.lyricEvents||[],drawing:song?.lyricAnnotations?.[output.id]||{revision:0,strokes:[]}});}
     const send = (ref,type,withTimes) => {
       if(!ref||ref.closed)return;
       let sent=sentBackgrounds.get(ref);if(!sent){sent=new Map();sentBackgrounds.set(ref,sent);}
       for(const id of sent.keys())if(!state.displayOutputs.some(item=>item.id===id))sent.delete(id);
       const changed=!sent.has(output.id)||sent.get(output.id)!==output.background;
       const frame=outputLyricFrame(song,output,lines,currentIndex,withTimes);
-      ref.postMessage({type,...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),timestamps,...(changed?{background:normalizeBackground(output.background)}:{})},location.origin);
+      let events=sentEvents.get(ref);if(!events){events=new Map();sentEvents.set(ref,events);}const eventKey=song?.lyricEvents||null,eventsChanged=events.get(output.id)!==eventKey;events.set(output.id,eventKey);
+      ref.postMessage({type,...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),timestamps,...(eventsChanged?{events:eventKey||[]} :{}),...(changed?{background:normalizeBackground(output.background)}:{})},location.origin);
       sent.set(output.id,output.background);
     };
     send(state.displayWindows[index],'stageset-lyrics',false);
@@ -1323,6 +1331,12 @@ function fireEmbeddedMidiActions(trigger, song = selectedSong(), position = null
   for (const action of parseEmbeddedMidiActions(song.lyricsText)) {
     if (action.trigger !== trigger || (trigger === "time" && (action.time > position || action.time <= embeddedMidiLastPosition))) continue;
     for (const command of action.commands) sendEmbeddedMidiCommand(song, command);
+  }
+  if(trigger==='time')for(const event of song.lyricEvents||[]){
+    const texts=[song.lyricsText,...Object.values(song.lyricOutputLyrics||{})];
+    if(!texts.some(text=>text?.includes('[stage:'+event.id+']'))||event.time>position||event.time<=embeddedMidiLastPosition)continue;
+    if(event.kind==='midi'){const bytes=eventMidiBytes(event),output=lyricMidiOutput(song,event.channel-1);if(output)output.open().then(()=>output.send(bytes)).catch(error=>toast('MIDI: '+error.message));else toast('Evento MIDI: seleciona uma saída no mixer.');}
+    if(event.kind==='dmx'){if(window.stageSetDesktop?.dmxCue)void window.stageSetDesktop.dmxCue(event).catch(error=>toast('DMX: '+error.message));else toast('Eventos DMX requerem a aplicação desktop com a saída ligada.');}
   }
 }
 
@@ -1878,6 +1892,7 @@ function currentQueueIndex() {
 
 function persistSetlist() {
   localStorage.setItem("stageset-setlist", JSON.stringify(state.setlist));
+  showProject?.changed();
 }
 
 function exportSetlistFile() {
@@ -2239,7 +2254,7 @@ function screenContext(song, target) {
   let overlay;
   if(target==='main'){try{overlay=JSON.parse(localStorage.getItem('stageset-main-overlay')||'{}');}catch{}}
   else overlay=state.displayOutputs.find(output=>output.id===target)?.overlay;
-  return {songId:song?.id||'', title:song?.title||'', canEdit:state.mode==='studio'&&!!song&&!isDocumentSong(song), annotationVersion:song?.lyricAnnotations?.[target]?.revision||0, overlay:screenPreferences(overlay)};
+  return {songId:song?.id||'', title:song?.title||'', position:currentPosition(),playing:isPlaying(),canEdit:state.mode==='studio'&&!!song&&!isDocumentSong(song), annotationVersion:song?.lyricAnnotations?.[target]?.revision||0, overlay:screenPreferences(overlay)};
 }
 let screenRequests = Promise.resolve();
 function requestScreen(action, target, data = {}) {
@@ -2258,7 +2273,12 @@ function requestScreen(action, target, data = {}) {
     const annotation=song.lyricAnnotations?.[target]||{revision:0,strokes:[]};
     if(action==='drawing-read')return {revision:annotation.revision,strokes:validateDrawing(annotation.strokes)};
     let updated, result;
-    if(action==='drawing-save'){
+    if(action==='event-save'){
+      if(state.mode!=='studio')throw Error('Entra no Studio para inserir eventos.');
+      const event=validateEvent(data.event),events=[...(song.lyricEvents||[]).filter(e=>e.id!==event.id),event];
+      if(events.length>256||events.reduce((n,e)=>n+(e.data?.length||0),0)>20000000)throw Error('Máximo de 256 eventos e 20 MB de multimédia por música.');
+      updated={...song,lyricEvents:events};result={saved:true};
+    }else if(action==='drawing-save'){
       if(data.revision!==annotation.revision)throw Error('O desenho mudou noutra janela. O teu desenho continua aqui; reabre esta saída para carregar a versão guardada.');
       const drawing={revision:annotation.revision+1,strokes:validateDrawing(data.strokes)};
       updated={...song,lyricAnnotations:{...song.lyricAnnotations,[target]:drawing}};result={revision:drawing.revision};
@@ -2579,6 +2599,7 @@ async function refreshDisplays() {
 
 function saveDisplayOutputs() {
   localStorage.setItem("stageset-display-outputs", JSON.stringify(state.displayOutputs));
+  showProject?.changed();
   const select = $("#lyrics-output-target"), selected = select.value;
   select.replaceChildren(new Option("Palco principal", "main"));
   state.displayOutputs.forEach((output) => select.add(new Option(output.name, output.id)));
@@ -2614,7 +2635,7 @@ window.addEventListener('message',event=>{
     const reply=body=>event.source.postMessage({type:'stageset-screen-response',output:d.output,requestId:d.requestId,...body},location.origin);
     void requestScreen(d.action,d.output,d).then(result=>reply({result}),error=>reply({error:error.message}));return;
   }
-  if(d?.type==='stageset-mosaic-ready'||d?.type==='stageset-output-ready'){sentBackgrounds.delete(event.source);void refreshDisplays().then(refreshMosaic);return;}
+  if(d?.type==='stageset-mosaic-ready'||d?.type==='stageset-output-ready'){sentBackgrounds.delete(event.source);sentEvents.delete(event.source);void refreshDisplays().then(refreshMosaic);return;}
   if(d?.type==='stageset-mosaic-timestamps' && mosaic){localStorage.setItem('stageset-mosaic-timestamps',String(!!d.value));refreshMosaic();return;}
   if(!['stageset-mosaic-setting','stageset-output-setting'].includes(d?.type))return;
   const output=state.displayOutputs.find(o=>o.id===d.output);if(!output || (!mosaic && state.displayOutputs[windowIndex]!==output))return;
@@ -3425,7 +3446,7 @@ function renderLyrics() {
     ? song.midiLyricLines.map((line) => ({ time: midiData.barBeatToSeconds(line.bar, line.beat), text: line.text, sourceIndex: line.sourceIndex }))
     : [];
   const embeddedMidiLyrics = readableMidiLyrics(midiData);
-  const baseTimedLines = song?.lyricLines?.length ? song.lyricLines : taggedMidiLines.length ? taggedMidiLines : embeddedMidiLyrics;
+  const baseTimedLines = withEventRows(song?.lyricsText,song?.lyricLines?.length ? song.lyricLines : taggedMidiLines.length ? taggedMidiLines : embeddedMidiLyrics,song?.lyricEvents);
   const timedLines = song?.lyricsText && baseTimedLines.length ? (() => {
     const sourceLines = song.lyricsText.split(/\r?\n/), bySource = new Map();
     baseTimedLines.forEach((line) => { const list = bySource.get(line.sourceIndex) ?? []; list.push(line); bySource.set(line.sourceIndex, list); });
@@ -3504,7 +3525,12 @@ function renderLyrics() {
       ? `${String(song.midiLyricLines[displayedLine]?.bar ?? 0).padStart(2, "0")}:${String(song.midiLyricLines[displayedLine]?.beat ?? 0)} · ${displayedLine + 1}/${song.midiLyricLines.length}`
       : `${String(song.midiLyricLines[0]?.bar ?? 0).padStart(2, "0")}:${String(song.midiLyricLines[0]?.beat ?? 0)} · ${song.midiLyricLines.length} tags`
     : displayedLine < 0 ? `${sourceLines.length} linhas` : `${String(displayedLine + 1).padStart(2, "0")} / ${String(sourceLines.length).padStart(2, "0")}`;
-  } finally { mainLyricsScreen?.update(screenContext(selectedSong(),'main')); }
+  } finally {
+    const song=selectedSong(),container=$('#lyrics-content');
+    for(const line of container.querySelectorAll('.lyric-line')){if(line.textContent.includes('[stage:'))line.innerHTML=eventMarkup(coloredLyricHtml(line.textContent));}
+    hydrateEvents(container,song?.lyricEvents,currentPosition(),isPlaying());
+    mainLyricsScreen?.update(screenContext(song,'main'));
+  }
 }
 
 function syncTrackDetails() {
@@ -3977,10 +4003,8 @@ async function importLyrics(file) {
   toast(song.lyricLines.length ? "Letras sincronizadas por tempo importadas." : song.midiLyricLines.length ? "Letras com referências de compasso/tempo importadas." : "Letras importadas.");
 }
 
-function exportBackup() {
-  if (!requireStudio()) return;
-  try {
-    const blob = createBackup(state.songs, {
+function currentShowBackup() {
+    return createBackup(state.songs, {
       setlist: state.setlist,
       playedSongIds: [...state.playedSongIds],
       currentId: state.currentId,
@@ -3993,6 +4017,11 @@ function exportBackup() {
       interSongDelay: state.interSongDelay,
       interfaceSettings: Object.fromEntries(transferSettingKeys.map(key=>[key,localStorage.getItem(key)])),
     });
+}
+function exportBackup() {
+  if (!requireStudio()) return;
+  try {
+    const blob = currentShowBackup();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -4005,13 +4034,14 @@ function exportBackup() {
   }
 }
 
-async function restoreBackupFile(file) {
+async function restoreBackupFile(file,options={}) {
   if (!requireStudio()) return;
   try {
     const backup = await readBackup(file);
     const count = backup.songs.length;
     const description = count === 1 ? "1 faixa" : count + " faixas";
-    if (!window.confirm("Abrir este show com " + description + " e substituir a biblioteca e setlist atuais? Esta ação não pode ser desfeita.")) return;
+    if (options.ask!==false&&!window.confirm("Abrir este show com " + description + " e substituir a biblioteca e setlist atuais? Guarda o show atual antes de continuar.")) return;
+    if(!options.keepFolder)await showProject?.detach();
     await dbReplaceAll(backup.songs);
     audio.pause();
     midiPlayer.pause();
@@ -4070,7 +4100,9 @@ async function restoreBackupFile(file) {
     else await clearCurrentSong();
     renderSetlist();
     toast("Show aberto: " + description + ".");
+    return true;
   } catch (error) {
+    if(options.ask===false)throw error;
     toast(error.message || "Não foi possível restaurar esta cópia.");
   }
 }
@@ -4133,6 +4165,11 @@ $("#add-audio").addEventListener("click", () => $("#audio-files").click());
 $("#add-folder").addEventListener("click", () => $("#folder-files").click());
 $("#empty-add").addEventListener("click", () => $("#audio-files").click());
 $("#backup-export").addEventListener("click", exportBackup);
+async function clearLibraryContents(){
+  if(queueDelayTimer)clearTimeout(queueDelayTimer);queueDelayTimer=null;
+  await dbReplaceAll([]);state.songs=[];state.setlist=[];state.playedSongIds=new Set();state.quickies=Array(9).fill(null);persistSetlist();persistQuickies();localStorage.setItem('stageset-played-song-ids','[]');await clearCurrentSong();showProject?.changed();
+}
+$('#clear-library').onclick=async()=>{if(!requireStudio()||!confirm('Limpar a biblioteca e a setlist deste show? Os ficheiros de origem e as cópias na pasta do show não são apagados.'))return;try{await showProject?.save();await clearLibraryContents();toast('Biblioteca limpa. Ficheiros de origem preservados.');}catch(e){toast(e.message);}};
 $("#report-button").addEventListener("click", () => { $("#report-modal").hidden = false; });
 $("#report-setlist").addEventListener("click", () => exportReport("setlist"));
 $("#report-library").addEventListener("click", () => exportReport("library"));
@@ -4866,7 +4903,11 @@ $('#ip-midi-start').onclick=async()=>{
 };
 $('#ip-midi-stop').onclick=async()=>{await networkMidi.stop();$('#ip-midi-start').disabled=false;$('#ip-midi-stop').disabled=true;$('#ip-midi-list').replaceChildren();$('#ip-midi-status').textContent='Desligado';};
 mainLyricsScreen=createLyricsScreen({host:$('#lyrics-stage'),viewport:$('#lyrics-content'),request:(action,data)=>requestScreen(action,'main',data)});
-initialize();
+hostPublisher=setupHostSettings({container:$('.settings-modal'),outputs:()=>state.displayOutputs.map(o=>({id:o.id,name:o.name})),refresh:refreshMosaic});
+attachEventInserter($('#lyrics-editor-text'),{root:$('.lyrics-editor-modal'),context:()=>({songId:editingLyricsSongId,output:editingLyricsOutput,position:currentPosition()}),save:(ctx,event)=>requestScreen('event-save',ctx.output,{songId:ctx.songId,event})});
+showProject=setupShowProject({snapshot:async()=>({backup:currentShowBackup(),files:await showFiles(state.songs)}),clear:clearLibraryContents,restore:restoreBackupFile,allow:requireStudio,notify:toast});
+initialize().then(()=>showProject.ready()).catch(e=>toast(e.message));
+let savedShowPreferences='';setInterval(()=>{if(!showProject?.active)return;const preferences=JSON.stringify([...transferSettingKeys.map(key=>localStorage.getItem(key)),state.volume,state.autoScroll,state.quickies,state.pedalMappings,state.hideSetlistDuringPlayback,state.interSongDelay,[...state.playedSongIds]]);if(preferences!==savedShowPreferences){savedShowPreferences=preferences;showProject.changed();}},1500);
 
 
 $('#learn-key').onclick=()=>{buttonLearnKind='key';$('#learn-modal').hidden=true;toast('Prime o atalho de teclado. Escape cancela.');};

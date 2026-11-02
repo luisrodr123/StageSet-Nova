@@ -23,12 +23,17 @@
           <span id="set-count">0 itens na coleção</span>
         </div>
         <div class="topbar-actions">
+          <button class="backup-button" id="new-show" type="button" data-studio-only>Novo show</button>
           <details class="topbar-menu"><summary>Menu</summary><div class="topbar-menu-items">
           <button class="backup-button" id="report-button" type="button" title="Imprimir ou exportar um relatório">Relatórios</button>
           <button class="backup-button" id="setlist-save" type="button" data-studio-only title="Guardar setlist atual">Guardar setlist</button>
           <button class="backup-button" id="setlist-load" type="button" data-studio-only title="Carregar setlist">Abrir setlist</button>
           <input id="setlist-file" type="file" accept=".stagesetlist,.json,application/json" hidden />
           <button class="backup-button" id="backup-export" type="button" data-studio-only title="Guardar o espetáculo completo, incluindo músicas e setlist">Guardar show</button>
+          <span id="show-status" role="status">Show sem pasta</span>
+          <button class="backup-button" id="show-save-folder" type="button" data-studio-only>Guardar na pasta</button>
+          <button class="backup-button" id="show-open-folder" type="button" data-studio-only>Abrir pasta de show</button>
+          <button class="backup-button" id="show-zip" type="button" data-studio-only>Exportar pasta ZIP</button>
           <button class="backup-button" id="backup-restore" type="button" data-studio-only title="Abrir um espetáculo guardado">Abrir show</button>
           <input id="backup-file" type="file" accept=".stagebackup,application/octet-stream" hidden />
           </div></details>
@@ -37,7 +42,7 @@
           <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.13</span>
+          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.15</span>
         </div>
       </header>
 
@@ -46,7 +51,7 @@
           <section class="panel setlist-panel">
             <div class="panel-heading compact-heading">
               <div><span class="eyebrow">EM CENA</span><h2>Setlist <span class="heading-count" id="setlist-count">0</span></h2></div>
-              <div class="setlist-heading-actions" data-studio-only><button class="subtle-button" id="clear-played" title="Limpar marcas de músicas tocadas">Tocadas ✓</button><button class="subtle-button" id="clear-setlist" title="Limpar setlist">Limpar</button></div>
+              <div class="setlist-heading-actions" data-studio-only><button class="subtle-button" id="clear-played" title="Limpar marcas de músicas tocadas">Tocadas ✓</button><button class="subtle-button" id="clear-setlist" title="Limpar apenas a setlist">Limpar setlist</button></div>
             </div>
             <div class="setlist-items" id="setlist-items"></div>
             <div class="setlist-empty" id="setlist-empty">Adiciona músicas da biblioteca para montar a setlist.</div>
@@ -66,6 +71,7 @@
                 <h1>Biblioteca</h1>
               </div>
               <div class="library-import-actions" data-studio-only>
+                <button class="backup-button" id="clear-library" type="button">Limpar biblioteca</button>
                 <button class="backup-button" id="create-song" type="button">Nova música</button><input id="new-song-files" type="file" accept="audio/*,.mid,.midi,.kar,.zip" multiple hidden />
                 <button class="round-add folder-add" id="add-folder" type="button" aria-label="Importar uma pasta" title="Importar uma pasta de música"><span class="folder-icon" aria-hidden="true"></span></button>
                 <button class="round-add" id="add-audio" type="button" aria-label="Importar faixas ou documentos" title="Importar áudio, MIDI, CD+G, PDF, RTF, TXT ou ZIP">+</button>
@@ -239,6 +245,7 @@
           </form>
         </section>
       </div>
+      <div class="modal-backdrop" id="new-show-modal" hidden><section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="new-show-title"><h2 id="new-show-title">Novo show</h2><form id="new-show-form"><label class="lyrics-editor-field">Nome do show <input id="new-show-name" required maxlength="100" /></label><p>Escolhe onde criar a pasta. O show atual é guardado numa cópia de segurança junto da nova pasta antes de começar com a biblioteca e setlist vazias. Os ficheiros originais são preservados.</p><div class="song-editor-actions"><button class="backup-button" id="cancel-new-show" type="button">Cancelar</button><button class="connect-button" type="submit">Criar pasta e novo show</button></div></form></section></div>
       <div class="modal-backdrop" id="new-song-modal" hidden><section class="help-modal" role="dialog" aria-modal="true" aria-labelledby="new-song-title"><h2 id="new-song-title">Nova música</h2><label class="lyrics-editor-field">Nome <input id="new-song-name" maxlength="100" /></label><p>Seleciona áudio, stems e até um ficheiro MIDI/KAR, ou cria uma música vazia.</p><div class="song-editor-actions"><button class="backup-button" id="cancel-new-song" type="button">Cancelar</button><button class="backup-button" id="new-song-empty" type="button">Criar vazia</button><button class="connect-button" id="new-song-import" type="button">Escolher ficheiros</button></div></section></div>
       <div class="modal-backdrop" id="lyrics-editor-modal" hidden>
         <section class="help-modal lyrics-editor-modal" role="dialog" aria-modal="true" aria-labelledby="lyrics-editor-title">

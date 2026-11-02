@@ -1,6 +1,8 @@
 // Test-only bridge, loaded in a hidden window with the disposable smoke profile.
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('stageSetDesktop',{
+  hostStart:config=>ipcRenderer.invoke('test-host-start',config),hostStop:()=>ipcRenderer.invoke('test-host-stop'),hostClients:()=>ipcRenderer.invoke('test-host-clients'),hostAssign:(id,output)=>ipcRenderer.invoke('test-host-assign',id,output),hostPublish:(id,frame)=>ipcRenderer.invoke('test-host-publish',id,frame),
+  dmxStart:config=>ipcRenderer.invoke('test-dmx-start',config),dmxStop:()=>Promise.resolve(),dmxCue:event=>ipcRenderer.invoke('test-dmx-cue',event),dmxBlackout:()=>Promise.resolve(),
   onIpMidiMessage:()=>{},onIpMidiStatus:()=>{},
   sessionInfo:()=>ipcRenderer.invoke('test-session-info'),
   startSession:config=>ipcRenderer.invoke('test-session-start',config),

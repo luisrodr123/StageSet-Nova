@@ -109,8 +109,26 @@ Roda, arrasto vertical ou **Anterior/Seguinte** deslocam apenas a vista das letr
 
 **Editar letras** abre o editor dentro desse ecrã, mesmo em fullscreen. Requer modo Studio. Os tempos permanecem no texto; Guardar afeta só aquela saída e a música indicada no título do editor, mesmo que entretanto se selecione outra. Alterações concorrentes são recusadas sem apagar o rascunho; copiar o texto antes de cancelar e reabrir. O editor principal deve estar fechado para editar a mesma música numa saída.
 
-**Desenhar** ativa caneta e borracha com cor/espessura, Anular e Limpar. Cada traço é guardado ao largar o rato, por música e saída, e aparece também no painel correspondente do mosaico. Os desenhos ficam fixos sobre o ecrã, não presos a uma palavra; coordenadas proporcionais adaptam-se ao tamanho da janela. Até 200 traços e 30 000 pontos por música/saída. Em caso de erro, o desenho permanece na janela e surge a opção de tentar guardar novamente.
+**Desenhar** ativa caneta e borracha com cor/espessura, Anular e Limpar. Cada traço é guardado ao largar o rato, por música e saída, e aparece também no painel correspondente do mosaico. Desde a 0.14 os novos traços acompanham as linhas no scroll/foco; notas antigas têm conversão explícita. Até 200 traços e 30 000 pontos por música/saída. Em caso de erro, o desenho permanece na janela e surge a opção de tentar guardar novamente.
 
 Código: lyrics-screen.js/CSS (menu, fullscreen, vista e desenho), screen-data.js (validação), app.js (pedidos autenticados pela janela de origem, persistência e conflitos), lyric-window.js/mosaic.js (apresentação). Testes em tests/screens-ui.cjs e tests/screen-data.test.mjs. Desenhos em song.lyricAnnotations[outputId]; preferências em displayOutputs[].overlay e stageset-main-overlay. Os desenhos são locais, não são transmitidos pelo transporte Master/Slave.
 
 Código: desktop/session-link.cjs (máquina de estados e sockets), session-ui.js (configuração/lista), app.js (transporte) e IPC em desktop/main.cjs/preload.cjs. Testes de multicast real entre duas instâncias no mesmo PC; tests/session-ui.cjs usa ponte simulada num perfil temporário para testar o transporte real da aplicação. Falta ensaio físico em dois PCs, interfaces e rede do espetáculo.
+
+## Continuidade da versão 0.14
+
+Utilização e configuração: [Host, HTTPS, eventos, SL04 e PDF](HOST-E-EVENTOS.md). O recetor Host é distinto de um StageSet Slave: recebe a apresentação da letra do servidor e não precisa da biblioteca áudio local.
+
+- `lyric-ink.js`: chaves de linha e projeção dos traços; `lyrics-pdf.js`: paginação/raster e contentor PDF.
+- `lyric-events.js`: validação, menu Inserir, campos MIDI/DMX, importação e apresentação multimédia. Definições em `song.lyricEvents`; referências `[stage:id]` no texto de cada saída. `backup.js` guarda os anexos como payload binário para não esgotar o cabeçalho JSON.
+- `desktop/dmx.cjs`: emissor ArtDmx UDP 6454, quatro universos, fades e blackout; a SL04 usa o adaptador de rede USB, não uma porta série.
+- `desktop/host-server.cjs`: servidor HTTP/HTTPS, autorização, presença e atribuição; `host-settings.js`: interface no desktop; `host.*`/`host-sw.js` e ícones: recetor PWA. O servidor publica só a saída atribuída e os anexos referenciados nessa letra.
+- `scripts/host-certificate.ps1`: PFX protegido + CA pública para HTTPS local; não altera confiança do sistema. Certificados/chaves ficam fora do Git.
+- `tests/features-014.cjs`, `tests/host-dmx-events.test.mjs`, `tests/host-https.mjs` e extensão de `tests/session-ui.cjs`: desenho ancorado, PDF, importação real de imagem/vídeo, backup, recetor móvel, TLS, protocolos e ponte desktop.
+
+Repetir os comandos de validação e distribuição descritos no início deste guia. O teste TLS opcional recebe `STAGESET_TEST_CERT_DIR` e `STAGESET_TEST_PFX_PASSWORD` apenas no ambiente temporário; não colocar palavras-passe em argumentos, commits ou logs. Ensaios pendentes são físicos: SL04, iOS/Android/macOS/Linux, vários monitores e rede do espetáculo. O PDF é rasterizado; o recetor requer uma ligação ativa para acompanhar o palco.
+
+## Versão 0.15: pastas e Host portátil
+
+Consultar [Shows e Host portátil](SHOWS-E-HOST-PORTATIL.md). show-project.js coordena gravação e interface; desktop/show-folder.cjs restringe escrita à pasta escolhida; zip-store.js cria ZIP padrão; desktop/host-main.cjs é o recetor dedicado e desktop/host-builder.cjs configura a compilação. A versão 0.14 não foi distribuída separadamente. Código 0.15 em validação final; consultar STAGESET-ALTERACOES.md antes de gerar uma release.
+
