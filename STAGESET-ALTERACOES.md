@@ -1,11 +1,18 @@
 # StageSet — alterações anotadas
 
-## Versão 0.15.0 — em desenvolvimento
+## 2026-11-02 — versão 0.15.0
 
-Registar aqui as alterações, testes e limitações antes de distribuir.
+- Botão explícito Limpar setlist; mantém as músicas na biblioteca. Limpar biblioteca pede confirmação e preserva ficheiros originais e cópias na pasta do show.
+- Novo show cria pasta própria, guarda cópia do show anterior junto dessa pasta e começa com biblioteca/setlist vazias. Importações, stems, MIDI, documentos, letras e anexos são copiados para a pasta; Show.stagebackup contém o restauro completo.
+- Gravação automática na pasta após alterações, estado de gravação e botão Guardar na pasta. Abrir pasta de show e exportação ZIP da pasta completa, até 2 GB. Ficheiros retirados da biblioteca permanecem na pasta.
+- Desktop recorda a pasta entre arranques. No browser, requer acesso a pastas e nova seleção após reabrir. Extrair o ZIP antes de usar Abrir pasta de show noutro PC; para shows maiores copiar a pasta diretamente.
+- Aplicativo StageSet Host portátil Windows: endereço, ligação HTTP/HTTPS, código e atribuição de saída, sem biblioteca nem áudio local. HTTPS requer confiança normal do certificado.
+- Integra as quatro ideias implementadas como 0.14; não houve distribuição intermédia 0.14.
+
+Validação: 26 testes automáticos aprovados, incluindo backup de vários anexos grandes, ArtDmx em loopback, proteção de caminhos, preservação dos originais, pasta e estrutura ZIP. Suite Electron da aplicação e funções 0.14 aprovada; testes adicionais dos novos botões/Host portátil e empacotamento em curso. SL04 física e cinco sistemas reais por ensaiar.
 
 
-## Versão 0.14.0 — em desenvolvimento
+## Versão 0.14.0 — incorporada na 0.15.0
 
 - Traços novos associados às linhas das letras: acompanham o scroll, foco e redimensionamento. Notas antigas preservadas com opção explícita de as fixar às linhas visíveis.
 - Exportação PDF por saída: letra completa e anotações, páginas A4 e nome da música/janela. PDF visual rasterizado, sem texto pesquisável.
@@ -14,7 +21,7 @@ Registar aqui as alterações, testes e limitações antes de distribuir.
 - StageSet Host web: recetores com código de sessão, presença automática após ligação e atribuição de saída no StageSet. Recebe letras, desenhos, fundos e multimédia; não recebe autorização para controlar o transporte.
 - Manifesto e ícones para instalação web nos cinco sistemas pedidos. HTTP para teste no browser; HTTPS com certificado PFX e confiança no dispositivo para instalação. Script de criação de certificados locais, sem instalar confiança automaticamente.
 
-Validação em curso. 24 testes de protocolo/backup aprovados, incluindo receção ArtDmx real em loopback e autenticação/isolamento dos recetores. Faltam concluir os testes visuais das novidades, empacotamento e publicação. A SL04 física e os cinco sistemas não foram testados neste computador.
+Validação local aprovada: desenho acompanha scroll, PDF de três páginas renderizado e revisto, imagem/vídeo importados e descodificados, dimensões, backups, recetor a 390×844, atribuição/revogação, isolamento e ponte desktop com disparo temporal DMX. HTTPS ensaiado com PFX, cadeia de confiança e IP SAN, sem instalar confiança no Windows. A SL04 física e os cinco sistemas não foram testados neste computador.
 
 
 ## 2026-10-31 — versão 0.13.0
