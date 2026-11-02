@@ -9,7 +9,14 @@
 - Aplicativo StageSet Host portátil Windows: endereço, ligação HTTP/HTTPS, código e atribuição de saída, sem biblioteca nem áudio local. HTTPS requer confiança normal do certificado.
 - Integra as quatro ideias implementadas como 0.14; não houve distribuição intermédia 0.14.
 
-Validação: 26 testes automáticos aprovados, incluindo backup de vários anexos grandes, ArtDmx em loopback, proteção de caminhos, preservação dos originais, pasta e estrutura ZIP. Suite Electron da aplicação e funções 0.14 aprovada. Recetor Host dedicado testado com ligação HTTP real, código, atribuição, receção de letras e isolamento do código remoto. SL04 física e cinco sistemas reais por ensaiar. Empacotamento e verificação dos binários em curso.
+Validação: 26 testes automáticos aprovados, incluindo backup de vários anexos grandes, ArtDmx em loopback, proteção de caminhos, preservação dos originais, pasta e estrutura ZIP. Suite Electron aprovada, incluindo Novo show, salvaguarda do anterior, gravação automática, ZIP, limpeza separada e restauro. Recetor Host dedicado testado com ligação HTTP real, código, atribuição, receção de letras e isolamento do código remoto. Ambas as suites também passaram nos app.asar distribuídos, correspondentes ao código d68d621. SL04 física e cinco sistemas reais por ensaiar.
+
+Distribuição Windows x64 gerada, sem assinatura digital:
+
+- StageSet-0.15.0-Portable-x64.exe — SHA256 d53175ab71f6731de8bd2908a5b5ebcc5fc07df694b30398d737ceed584463e6.
+- StageSet-0.15.0-Setup-x64.exe — SHA256 abc75e82d4b1dd6ea977643afe9c3051c2511772dcd1d820741ab4df9553ca1f.
+- StageSet-Host-0.15.0-Portable-x64.exe — SHA256 dcd048a9c8f52c78721dc9cb918408fdd8577a20ad5ae329b23831ff75e92722.
+- O workflow GitHub compila os três executáveis e verifica instalação/início/desinstalação do StageSet num Windows descartável. Uma execução no backup encontrou uma porta reservada do Windows; os testes passaram a pedir uma porta disponível ao sistema. A execução do código d68d621 no principal passou os testes e encontrava-se a compilar o Host durante esta geração: https://github.com/luisrodr123/StageSet-Nova/actions/runs/41446246168.
 
 
 ## Versão 0.14.0 — incorporada na 0.15.0

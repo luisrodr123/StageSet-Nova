@@ -24,7 +24,7 @@ module.exports=async({win,mosaic,evaluate,children})=>{
  band.hide();
  const host=new HostServer();let client;
  try{
-  const info=await host.start({address:'127.0.0.1',port:48000+Math.floor(Math.random()*10000)},process.env.STAGESET_TEST_ROOT||path.resolve(__dirname,'..'));
+  const info=await host.start({address:'127.0.0.1',port:await require('./local-port.cjs')()},process.env.STAGESET_TEST_ROOT||path.resolve(__dirname,'..'));
   client=new BrowserWindow({show:false,width:390,height:844,webPreferences:{contextIsolation:true,sandbox:true,backgroundThrottling:false}});children.push(client);await client.loadURL(info.url+'/host.html');
   await js(client,`document.getElementById('name').value='Telemóvel teste';document.getElementById('code').value=${JSON.stringify(info.code)};document.getElementById('join').requestSubmit();`);await until(()=>host.list().length===1,'Host registration failed');
   host.publish('2',{songId:'fixture',title:'Teste recetor',name:'Banda',lines:['Recebida 1','Recebida 2'],htmlLines:['Recebida 1','Recebida 2'],currentIndex:1,fontSize:32,baseColor:'#ffffff',color:'#65e2c1',mediaVersion:1,events:[],drawing:{revision:0,strokes:[]},annotationVersion:0});host.assign(host.list()[0].id,'2');

@@ -2,7 +2,7 @@ const {app,BrowserWindow}=require('electron'),fs=require('node:fs/promises'),pat
 const until=async fn=>{for(let i=0;i<100;i++){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Host app timeout');};
 (async()=>{
  app.setPath('userData',await fs.mkdtemp(path.join(os.tmpdir(),'stageset-host-smoke-')));app.commandLine.appendSwitch('host-smoke');require(path.join(process.env.STAGESET_HOST_TEST_ROOT||path.resolve(__dirname,'..'),'desktop/host-main.cjs'));await app.whenReady();
- const info=await server.start({address:'127.0.0.1',port:48000+Math.floor(Math.random()*10000)},path.resolve(__dirname,'..'));let home;
+ const info=await server.start({address:'127.0.0.1',port:await require('./local-port.cjs')()},path.resolve(__dirname,'..'));let home;
  await until(()=>{home=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().endsWith('host-home.html'));return home&&!home.webContents.isLoading();});
  await home.webContents.executeJavaScript(`document.getElementById('address').value=${JSON.stringify(info.url)};document.getElementById('connect').requestSubmit();`,true);let receiver;
  await until(()=>{receiver=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL()===info.url+'/host.html');return receiver&&!receiver.webContents.isLoading();});

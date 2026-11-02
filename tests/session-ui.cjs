@@ -61,7 +61,7 @@ module.exports=async({url,children})=>{
     info={...info,interfaces:[{name:'Ethernet',address:'192.168.10.99'}],recommendedAddress:'192.168.10.99'};
     await until(()=>evalJs(`return !document.getElementById('session-refresh').disabled`));await evalJs(`document.getElementById('session-refresh').click();`);
     await until(()=>evalJs(`return document.getElementById('session-interface').value==='192.168.10.99'`));
-    await evalJs(`const select=document.querySelector('[data-host=interface]');select.add(new Option('Loopback teste','127.0.0.1'));select.value='127.0.0.1';document.querySelector('[data-host=port]').value=${48000+Math.floor(Math.random()*10000)};document.querySelector('[data-host=start]').click();`);
+    await evalJs(`const select=document.querySelector('[data-host=interface]');select.add(new Option('Loopback teste','127.0.0.1'));select.value='127.0.0.1';document.querySelector('[data-host=port]').value=${await require('./local-port.cjs')()};document.querySelector('[data-host=start]').click();`);
     await until(()=>host.server?.listening&&host.frames.size>0);
     if(!host.frames.get('2')?.lines.some(line=>line.includes('[stage:')))throw Error('Host publisher lost event lyrics');
     await evalJs(`document.querySelector('[data-dmx=start]').click();document.getElementById('close-settings').click();document.getElementById('progress').value='0';document.getElementById('progress').dispatchEvent(new Event('input'));document.getElementById('play').click();`);
