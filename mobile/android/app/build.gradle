@@ -1,0 +1,17 @@
+plugins { id 'com.android.application' }
+def releaseInfo = new groovy.json.JsonSlurper().parse(file('../../../package.json'))
+def parts = releaseInfo.version.split('\\.').collect { it as int }
+android {
+    namespace 'pt.stageset.host'
+    compileSdk 35
+    buildFeatures { buildConfig true }
+    defaultConfig {
+        applicationId 'pt.stageset.host'
+        minSdk 26
+        targetSdk 35
+        versionCode parts[0] * 1000000 + parts[1] * 1000 + parts[2]
+        versionName releaseInfo.version
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

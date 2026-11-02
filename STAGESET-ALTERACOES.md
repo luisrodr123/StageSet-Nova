@@ -1,5 +1,15 @@
 # StageSet — alterações anotadas
 
+## 2026-11-02 — versão 0.16.0 — em validação
+
+- Corrigido o Host portátil que terminava sem janela: o lançador passa a extrair diretamente os ficheiros, evitando a falha observada no caminho de extração 7z. Janela mostrada após carregar; erro de arranque apresentado e perfil Host separado da biblioteca StageSet.
+- Teste novo abre o EXE final, confirma janela Windows visível, liga a um servidor real, recebe letras e fecha com código zero. Este teste passou localmente e passa a fazer parte do workflow Windows. Os testes anteriores da 0.15 carregavam o app.asar e não detetavam a falha do lançador.
+- Host nativo Android em preparação para telemóveis e tablets, com endereço, ligação, letras, modo imersivo e gravação de PDF. Projeto iOS universal para iPhone e iPad, com acesso à rede local e partilha de PDF; compilação e teste em simulador configurados no GitHub.
+- Versão web instalável mantida para ambos os sistemas. iOS nativo requer assinatura e aprovisionamento Apple para instalação física; não é apresentado um IPA sem assinatura como instalável.
+
+Validação em curso: 26 testes automáticos, Host Electron e EXE portátil real aprovados. Restantes compilações e testes móveis ainda em execução; aparelhos físicos não ensaiados.
+
+
 ## 2026-11-02 — versão 0.15.0
 
 - Botão explícito Limpar setlist; mantém as músicas na biblioteca. Limpar biblioteca pede confirmação e preserva ficheiros originais e cópias na pasta do show.

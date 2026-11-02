@@ -21,3 +21,10 @@ desktop.ini
 *.pfx
 *.p12
 *.key
+mobile/android/.gradle/
+mobile/android/**/build/
+mobile/android/local.properties
+mobile/ios/build/
+mobile/ios/*.xcodeproj/xcuserdata/
+*.keystore
+*.jks

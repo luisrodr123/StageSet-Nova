@@ -1,0 +1,35 @@
+name: StageSetHost
+options:
+  bundleIdPrefix: pt.stageset
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  StageSetHost:
+    type: application
+    platform: iOS
+    sources: [StageSetHost]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pt.stageset.host
+        PRODUCT_NAME: StageSet Host
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "0.16.0"
+        CURRENT_PROJECT_VERSION: "16000"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: StageSetHost/Info.plist
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets: [StageSetHostUITests]
+  StageSetHostUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [StageSetHostUITests]
+    dependencies:
+      - target: StageSetHost
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic

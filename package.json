@@ -1,6 +1,6 @@
 {
   "name": "stage-set",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Windows setlist, lyrics and karaoke player",
   "private": true,
   "type": "module",
@@ -18,7 +18,8 @@
     "test:smoke": "electron tests/smoke.cjs",
     "bump": "node scripts/version.mjs",
     "dist:host": "electron-builder --config desktop/host-builder.cjs --win portable --x64 --publish never",
-    "test:host": "electron tests/receiver-smoke.cjs"
+    "test:host": "electron tests/receiver-smoke.cjs",
+    "test:host:portable": "node tests/host-portable.mjs"
   },
   "devDependencies": {
     "electron": "^44.7.2",

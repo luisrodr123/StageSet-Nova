@@ -26,6 +26,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - run: npm run dist:host
+      - run: npm run test:host:portable
       - run: node scripts/checksums.mjs
       - name: Instalar, iniciar e desinstalar em Windows isolado
         run: ./scripts/test-distribution.ps1
