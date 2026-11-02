@@ -25,7 +25,7 @@ const body=await readFile(`docs/RELEASE-${version.split('.').slice(0,2).join('.'
 for(const repo of repos){
   const base=`https://api.github.com/repos/${repo}`;
   let release=await api(`${base}/releases/tags/v${version}`);
-  if(!release)release=await api(`${base}/releases`,{method:'POST',body:JSON.stringify({tag_name:`v${version}`,name:`StageSet ${version} · Windows`,body,draft:true,prerelease:true})});
+  if(!release)release=await api(`${base}/releases`,{method:'POST',body:JSON.stringify({tag_name:`v${version}`,name:`StageSet ${version} · Windows e Host móvel`,body,draft:true,prerelease:true})});
   if(!release)throw new Error(`Sem acesso ao repositório ${repo}`);
   for(const file of filenames){
     const name=path.basename(file),data=await readFile(file),digest='sha256:'+createHash('sha256').update(data).digest('hex');

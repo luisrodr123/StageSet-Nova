@@ -1,13 +1,25 @@
 # StageSet — alterações anotadas
 
-## 2026-11-02 — versão 0.16.0 — em validação
+## 2026-11-02 — versão 0.16.0
 
 - Corrigido o Host portátil que terminava sem janela: o lançador passa a extrair diretamente os ficheiros, evitando a falha observada no caminho de extração 7z. Janela mostrada após carregar; erro de arranque apresentado e perfil Host separado da biblioteca StageSet.
 - Teste novo abre o EXE final, confirma janela Windows visível, liga a um servidor real, recebe letras e fecha com código zero. Este teste passou localmente e passa a fazer parte do workflow Windows. Os testes anteriores da 0.15 carregavam o app.asar e não detetavam a falha do lançador.
-- Host nativo Android em preparação para telemóveis e tablets, com endereço, ligação, letras, modo imersivo e gravação de PDF. Projeto iOS universal para iPhone e iPad, com acesso à rede local e partilha de PDF; compilação e teste em simulador configurados no GitHub.
-- Versão web instalável mantida para ambos os sistemas. iOS nativo requer assinatura e aprovisionamento Apple para instalação física; não é apresentado um IPA sem assinatura como instalável.
+- Host nativo Android para telemóveis e tablets Android 8+, com endereço, ligação, letras, modo imersivo e gravação de PDF. APK pequeno que usa o WebView do sistema, com assinatura de desenvolvimento para ensaios; não é uma publicação Play Store.
+- Projeto iOS universal para iPhone e iPad (iOS/iPadOS 16+), com acesso à rede local e partilha de PDF. Distribuído como código XcodeGen; assinatura Apple necessária para instalação física. O utilizador escolheu testar primeiro no iPad através da versão web instalável.
+- PWA adaptada a tablets e telemóveis, margens de segurança, botões de toque, instruções de instalação Safari/Chrome, nome do dispositivo recordado e pedido de manter o ecrã acordado quando suportado. Código da sessão continua a ser introduzido ao ligar.
+- Guia HOST-ANDROID-IOS.md e projetos móveis disponíveis nos dois repositórios. O incremento de versão mantém também o projeto iOS e o cache Host alinhados.
 
-Validação em curso: 26 testes automáticos, Host Electron e EXE portátil real aprovados. Restantes compilações e testes móveis ainda em execução; aparelhos físicos não ensaiados.
+Validação aprovada: 26 testes automáticos, sintaxe/versões, suite Electron sobre o app.asar final e Host portátil real com janela visível/ligação/letras/saída zero. Windows isolado confirmou instalação/início/desinstalação e o novo teste do EXE Host: https://github.com/luisrodr123/StageSet-Nova/actions/runs/41536702226. Android: compilação APK e testes, lint sem erros, assinatura APK v2 verificada; ligação/receção e validação de endereços passaram no emulador de tablet no job Android de https://github.com/luisrodr123/StageSet-Nova/actions/runs/41545214282. O primeiro ensaio Android sem acesso KVM foi lento; o runner passou a permitir aceleração.
+
+iOS: compilação e teste de ligação/receção num simulador iPad passaram no job iOS de https://github.com/luisrodr123/StageSet-Nova/actions/runs/41536267330. Um ensaio seguinte encontrou instabilidade do foco do teclado no teste; passou a usar avanço/submissão pelo teclado. A nova execução está identificada no workflow móvel acima. Não se declara instalação em iPad físico nem se fornece IPA sem assinatura. PDF/partilha nativa móvel e aparelhos físicos/rede do espetáculo continuam por ensaiar; PDF nativo limitado a 30 MB.
+
+Distribuição local: código da aplicação principal fd3e30b; Host Windows conforme 860070d (sem alterações posteriores no runtime Host). SHA256SUMS.txt inclui os cinco artefactos:
+
+- StageSet-0.16.0-Portable-x64.exe — 740e265187e371e29507f6fe847f571925345f435d94bf1f47beb3284f2b694a.
+- StageSet-0.16.0-Setup-x64.exe — 7d3870432b7e46367460876559b2c6d12a9d8c5e3bb6329504ed3a866ed48a43.
+- StageSet-Host-0.16.0-Portable-x64.exe — 54c81f59a07d4af61eb39717e56e62d1c8010475e4dfeb4a4959fe7998909574.
+- StageSet-Host-0.16.0-Android-Test.apk — 1605475fb965b4333c0120d6e5ffafa3b99347e71b63858dfe4410099337914a.
+- StageSet-Host-0.16.0-iOS-Project.zip — 2da387224f62f8761d9d59cdc3ae50ee7a967ebae7965a0523132a04f30a61e5.
 
 
 ## 2026-11-02 — versão 0.15.0
