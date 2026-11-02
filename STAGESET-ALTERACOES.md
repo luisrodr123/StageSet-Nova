@@ -9,7 +9,7 @@
 - Aplicativo StageSet Host portátil Windows: endereço, ligação HTTP/HTTPS, código e atribuição de saída, sem biblioteca nem áudio local. HTTPS requer confiança normal do certificado.
 - Integra as quatro ideias implementadas como 0.14; não houve distribuição intermédia 0.14.
 
-Validação: 26 testes automáticos aprovados, incluindo backup de vários anexos grandes, ArtDmx em loopback, proteção de caminhos, preservação dos originais, pasta e estrutura ZIP. Suite Electron da aplicação e funções 0.14 aprovada; testes adicionais dos novos botões/Host portátil e empacotamento em curso. SL04 física e cinco sistemas reais por ensaiar.
+Validação: 26 testes automáticos aprovados, incluindo backup de vários anexos grandes, ArtDmx em loopback, proteção de caminhos, preservação dos originais, pasta e estrutura ZIP. Suite Electron da aplicação e funções 0.14 aprovada. Recetor Host dedicado testado com ligação HTTP real, código, atribuição, receção de letras e isolamento do código remoto. SL04 física e cinco sistemas reais por ensaiar. Empacotamento e verificação dos binários em curso.
 
 
 ## Versão 0.14.0 — incorporada na 0.15.0

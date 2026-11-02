@@ -1,5 +1,7 @@
 module.exports=async({url,children})=>{
   const {BrowserWindow,ipcMain}=require('electron'),path=require('node:path');
+  const fs=require('node:fs/promises'),folderParent=await fs.mkdtemp(path.join(require('node:os').tmpdir(),'stageset-show-ui-')),folder=new (require('../desktop/show-folder.cjs').ShowFolder)(path.join(folderParent,'profile/active.json'));let originalBackup;
+  for(const [name,fn] of Object.entries({info:()=>folder.info(),create:(name,previous)=>{originalBackup=previous;return folder.create(folderParent,name,previous);},save:s=>folder.save(s),open:()=>folder.open(folder.root),zip:()=>folder.zip(path.join(folderParent,'show.zip')),detach:async()=>{await folder.queue;folder.root=null;await fs.writeFile(folder.config,'{}');}}))ipcMain.handle('test-show-'+name,(_, ...args)=>fn(...args));
   const {HostServer}=require('../desktop/host-server.cjs'),host=new HostServer();let dmxConfig;const cues=[];
   for(const [name,fn] of Object.entries({start:config=>host.start(config,process.env.STAGESET_TEST_ROOT||path.resolve(__dirname,'..')),stop:()=>host.stop(),clients:()=>host.list(),assign:(id,output)=>host.assign(id,output),publish:(id,frame)=>host.publish(id,frame)}))ipcMain.handle('test-host-'+name,(_, ...args)=>fn(...args));
   ipcMain.handle('test-dmx-start',(_,config)=>{dmxConfig=config;});ipcMain.handle('test-dmx-cue',(_,event)=>{cues.push(event);});
@@ -68,6 +70,21 @@ module.exports=async({url,children})=>{
     await evalJs(`if(document.getElementById('lyrics-play-button').getAttribute('aria-pressed')==='true')document.getElementById('play').click();document.querySelector('[data-host=stop]').click();`);
     await until(()=>!host.server);
     console.log('Desktop Host publisher/settings and timed DMX cue routed through native bridge: OK');
+    await evalJs(`window.confirm=()=>true;if(!document.body.classList.contains('studio-mode')){document.getElementById('studio-mode-toggle').click();document.getElementById('studio-password-input').value='smoke-only-123';document.getElementById('studio-password-form').requestSubmit();}`);
+    await until(()=>evalJs(`return document.body.classList.contains('studio-mode')`));
+    await evalJs(`document.getElementById('new-show').click();document.getElementById('new-show-name').value='Ensaio teste';document.getElementById('new-show-form').requestSubmit();`);
+    await until(()=>evalJs(`return document.getElementById('new-show-modal').hidden&&!document.querySelector('.library-song')`));
+    if(!originalBackup?.byteLength)throw Error('New show did not safeguard the previous show');
+    await evalJs(`document.getElementById('create-song').click();document.getElementById('new-song-name').value='Faixa do novo show';document.getElementById('new-song-empty').click();`);
+    await until(()=>evalJs(`return document.querySelector('.library-song')?.textContent.includes('Faixa do novo show')`));
+    await until(async()=>{try{return (await fs.readdir(path.join(folder.root,'media'))).length===1&&await evalJs(`return document.getElementById('show-status').textContent.includes('guardado')`);}catch{return false;}});
+    await evalJs(`document.querySelector('.library-add').click();document.getElementById('clear-setlist').click();`);
+    if(!await evalJs(`return document.getElementById('setlist-count').textContent==='0'&&document.querySelectorAll('.library-song').length===1`))throw Error('Clear setlist removed library songs');
+    await evalJs(`document.getElementById('show-zip').click();`);await until(async()=>{try{return (await fs.stat(path.join(folderParent,'show.zip'))).size>0;}catch{return false;}});
+    const showRoot=folder.root;await evalJs(`document.getElementById('clear-library').click();`);await until(()=>evalJs(`return !document.querySelector('.library-song')`));if(!(await fs.readdir(path.join(showRoot,'media'))).length)throw Error('Clear library removed source copies');
+    await evalJs(`const input=document.getElementById('backup-file'),dt=new DataTransfer();dt.items.add(new File([new Uint8Array(${JSON.stringify([...new Uint8Array(originalBackup)])})],'previous.stagebackup'));input.files=dt.files;input.dispatchEvent(new Event('change'));`);
+    await until(()=>evalJs(`return document.querySelectorAll('.library-song').length===2`));
+    console.log('New show UI: safeguards, automatic folder save, ZIP, independent setlist/library clear and restore: OK');
     console.log('Native bridge UI: automatic IP, remote roles, confirmed blue/orange indicators, MIDI transport, loss and changed interfaces: OK');
-  }finally{win.destroy();await host.stop();for(const name of ['start','feedback','state','info','choose','handoff'])ipcMain.removeHandler('test-session-'+name);for(const name of ['start','stop','clients','assign','publish'])ipcMain.removeHandler('test-host-'+name);ipcMain.removeHandler('test-dmx-start');ipcMain.removeHandler('test-dmx-cue');}
+  }finally{win.destroy();await host.stop();for(const name of ['info','create','save','open','zip','detach'])ipcMain.removeHandler('test-show-'+name);for(const name of ['start','feedback','state','info','choose','handoff'])ipcMain.removeHandler('test-session-'+name);for(const name of ['start','stop','clients','assign','publish'])ipcMain.removeHandler('test-host-'+name);ipcMain.removeHandler('test-dmx-start');ipcMain.removeHandler('test-dmx-cue');}
 };

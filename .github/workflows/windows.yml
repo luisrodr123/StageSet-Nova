@@ -21,9 +21,11 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run test:smoke
+      - run: npm run test:host
       - run: npm run dist:win:all
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: npm run dist:host
       - run: node scripts/checksums.mjs
       - name: Instalar, iniciar e desinstalar em Windows isolado
         run: ./scripts/test-distribution.ps1
@@ -33,8 +35,11 @@ jobs:
           path: |
             dist/StageSet-*-Setup-x64.exe
             dist/StageSet-*-Portable-x64.exe
+            dist/host/StageSet-Host-*-Portable-x64.exe
             dist/SHA256SUMS.txt
             STAGESET-ALTERACOES.md
+            docs/HOST-E-EVENTOS.md
+            docs/SHOWS-E-HOST-PORTATIL.md
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()

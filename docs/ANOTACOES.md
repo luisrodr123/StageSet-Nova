@@ -1,9 +1,12 @@
-# Estado das anotações — StageSet 0.14.0
+# Estado das anotações — StageSet 0.15.0
 
 Este registo consolida os pedidos recebidos nesta conversa. O código das funções abaixo existe; a coluna de verificação distingue testes automáticos de ensaios físicos ainda necessários.
 
 | Pedido | Implementação / verificação |
 | --- | --- |
+| Limpar setlist e limpar biblioteca | Botões separados; biblioteca exige confirmação e preserva originais/cópias da pasta. |
+| Novo show, pasta própria e ZIP para outro PC | Cópia do show anterior, biblioteca vazia, gravação automática, pasta com anexos e backup completo; ZIP até 2 GB. |
+| Aplicativo Host separado para testar em paralelo | Recetor portátil Windows, endereço HTTP/HTTPS e mesmo código/atribuição da interface web. Sem biblioteca nem som local. |
 | Paint acompanha as letras | Novos traços ligados às linhas; scroll, foco, fontes e persistência testados. Migração explícita para desenhos antigos fixos. |
 | PDF por janela com letra e anotações | Exportação A4 multipágina rasterizada, nome da música/saída; PDF de três páginas renderizado e revisto. |
 | Botão direito → Inserir MIDI, imagem, vídeo e DMX | Ambos os editores, campos por tipo, tempo, dimensões e anexos no backup; importação/descodificação e encaminhamento DMX temporal testados. |

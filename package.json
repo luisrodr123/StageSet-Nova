@@ -17,7 +17,8 @@
     "check": "node scripts/check.mjs",
     "test:smoke": "electron tests/smoke.cjs",
     "bump": "node scripts/version.mjs",
-    "dist:host": "electron-builder --config desktop/host-builder.cjs --win portable --x64 --publish never"
+    "dist:host": "electron-builder --config desktop/host-builder.cjs --win portable --x64 --publish never",
+    "test:host": "electron tests/receiver-smoke.cjs"
   },
   "devDependencies": {
     "electron": "^44.7.2",
