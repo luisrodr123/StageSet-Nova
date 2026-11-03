@@ -65,7 +65,7 @@ export function createStageSetServer({ directory = root } = {}) {
 
     try {
       const content = await readFile(file);
-      response.writeHead(200, { "Content-Type": mime[extname(file)] ?? "application/octet-stream" });
+      response.writeHead(200, { "Content-Type": mime[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache" });
       response.end(content);
     } catch {
       response.writeHead(404).end("Not found");
