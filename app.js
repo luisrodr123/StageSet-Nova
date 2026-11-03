@@ -496,7 +496,7 @@ function updateAudioMixerRows(song) {
     const solo = row.querySelector(".audio-channel-solo");
     const mute = row.querySelector(".audio-channel-mute");
     if (solo) { solo.textContent = channel.solo ? "Desolo" : "Solo"; solo.setAttribute("aria-pressed", String(channel.solo)); solo.setAttribute("aria-label", channel.solo ? "Desativar solo" : "Ouvir apenas este canal"); }
-    if (mute) { mute.textContent = channel.muted ? "Ativar" : "Silenciar"; mute.setAttribute("aria-pressed", String(channel.muted)); }
+    if (mute) { mute.textContent = channel.muted ? "Unmute" : "Mute"; mute.setAttribute("aria-pressed", String(channel.muted)); }
   });
   for (const row of rows) {
     if (!row.dataset.stem) continue;
@@ -506,7 +506,7 @@ function updateAudioMixerRows(song) {
       const solo = row.querySelector(".midi-channel-solo");
       const mute = row.querySelector(".midi-channel-mute");
       if (solo) { solo.textContent = stem.solo ? "Desolo" : "Solo"; solo.setAttribute("aria-pressed", String(stem.solo)); solo.setAttribute("aria-label", stem.solo ? "Desativar solo" : `Ouvir apenas ${stem.name}`); }
-      if (mute) { mute.textContent = stem.muted ? "Ativar" : "Silenciar"; mute.setAttribute("aria-pressed", String(stem.muted)); }
+      if (mute) { mute.textContent = stem.muted ? "Unmute" : "Mute"; mute.setAttribute("aria-pressed", String(stem.muted)); }
     }
   }
 }
@@ -910,8 +910,8 @@ function renderAudioMixer() {
         const hasSolo = song.audioMix.some((item) => item.solo) || (song.audioStems ?? []).some((item) => item.solo);
         const audible = !setting.muted && (!hasSolo || setting.solo);
         row.classList.toggle("muted", !audible);
-        mute.textContent = setting.muted ? "Ativar" : "Silenciar";
-        mute.setAttribute("aria-label", `${setting.muted ? "Ativar" : "Silenciar"} canal mono ${channel + 1}`);
+        mute.textContent = setting.muted ? "Unmute" : "Mute";
+        mute.setAttribute("aria-label", `${setting.muted ? "Unmute" : "Mute"} canal mono ${channel + 1}`);
         mute.setAttribute("aria-pressed", String(setting.muted));
         solo.textContent = setting.solo ? "Desolo" : "Solo";
         solo.setAttribute("aria-label", `${setting.solo ? "Desativar solo" : "Ouvir apenas"} canal mono ${channel + 1}`);
@@ -963,7 +963,7 @@ function renderAudioMixer() {
       const mute = row.querySelector(".midi-channel-mute");
       const updateButtons = () => {
         solo.textContent = stem.solo ? "Desolo" : "Solo";
-        mute.textContent = stem.muted ? "Ativar" : "Silenciar";
+        mute.textContent = stem.muted ? "Unmute" : "Mute";
         const anySolo = (song.audioStems ?? []).some((item) => item.solo) || (song.audioMix ?? []).some((item) => item.solo);
         row.classList.toggle("muted", stem.muted || (anySolo && !stem.solo));
       };
@@ -1603,8 +1603,8 @@ function renderMidiMixer() {
     const mute = row.querySelector(".midi-channel-mute");
     const updateMute = () => {
       row.classList.toggle("muted", settings.muted);
-      mute.textContent = settings.muted ? "Ativar" : "Silenciar";
-      mute.setAttribute("aria-label", (settings.muted ? "Ativar" : "Silenciar") + " canal " + (channel.channel + 1));
+      mute.textContent = settings.muted ? "Unmute" : "Mute";
+      mute.setAttribute("aria-label", (settings.muted ? "Unmute" : "Mute") + " canal " + (channel.channel + 1));
       mute.setAttribute("aria-pressed", String(settings.muted));
     };
     updateMute();
@@ -2571,12 +2571,13 @@ function renderDisplayOutputSettings() {
     display.addEventListener("change", () => { output.displayId = display.value; saveDisplayOutputs(); void window.stageSetDesktop.assignDisplay(outputWindowName(output), display.value); });
     color.addEventListener("input", () => { output.color = color.value; saveDisplayOutputs(); if (editingLyricsOutput === output.id) showLyricsEditorOutput(output.id, false); broadcastLyricWindows(currentRenderedLyricLines(), [...document.querySelectorAll("#lyrics-content .lyric-line")].findIndex((line) => line.classList.contains("current"))); });
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "backup-button"; edit.textContent = "Editar letras"; edit.addEventListener("click", () => { $("#settings-modal").hidden = true; openLyricsEditor(output.id, true); });
+    const activate = document.createElement("button"); activate.type = "button"; activate.className = "backup-button"; activate.textContent = state.displayWindows[index] && !state.displayWindows[index].closed ? "Desativar janela" : "Ativar janela"; activate.addEventListener("click", () => { const ref=state.displayWindows[index]; if(ref && !ref.closed){ref.close();state.displayWindows[index]=null;} else { const url=new URL('./lyric-window.html',location.href);url.searchParams.set('output',output.id);state.displayWindows[index]=window.open(url.href,outputWindowName(output),'popup,width=1100,height=700,resizable=yes'); } renderDisplayOutputSettings(); });
     const size = document.createElement("input"); size.type = "number"; size.min = "16"; size.max = "96"; size.step = "1"; size.value = String(Number(lyricOutputSettings(selectedSong() || {}, output.id).fontSize) || 42); size.title = "Tamanho da letra para a música atual"; size.setAttribute("aria-label", `Tamanho de letra de ${output.name}`);
     size.addEventListener("input", () => { const value = Number(size.value); if (!selectedSong() || !Number.isFinite(value) || value < 16 || value > 96) return; void saveLyricOutputSettings(output.id, { fontSize: value }); });
     const remove = document.createElement("button"); remove.type = "button"; remove.className = "backup-button"; remove.textContent = "Remover"; remove.disabled = state.displayOutputs.length <= 1;
     remove.addEventListener("click", () => { state.displayOutputs.splice(index, 1); state.displayWindows.splice(index, 1).forEach((ref) => { try { ref?.close(); } catch {} }); saveDisplayOutputs(); renderDisplayOutputSettings(); refreshMosaic(); void refreshDisplays(); });
     const background=document.createElement('button');background.type='button';background.className='backup-button';background.textContent='Fundo';background.onclick=()=>backgroundEditor.select(output.id);
-    row.append(name, color, display, size, edit, background, remove); container.append(row);
+    row.append(name, color, display, size, edit, activate, background, remove); container.append(row);
   });
   $("#create-display-output").disabled = state.displayOutputs.length >= 8;
   backgroundEditor?.refresh();
@@ -4276,6 +4277,7 @@ $("#settings-button").addEventListener("click", () => {
   $("#settings-modal").hidden = false;
 });
 $("#close-settings").addEventListener("click", () => { $("#settings-modal").hidden = true; });
+$("#hosts-button")?.addEventListener("click", () => { $("#settings-button").click(); toast("Hosts visíveis e autorizados: consulta a secção Rede/Hosts nas Configurações."); });
 $("#settings-modal").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.hidden = true; });
 $("#settings-lyric-highlight").addEventListener("input", (event) => setLyricHighlightColor(event.target.value));
 $("#stem-provider").addEventListener("change", (event) => {
@@ -4414,7 +4416,13 @@ $("#timeline-pause").addEventListener("click", () => { if (isPlaying()) $("#play
 $("#timeline-stop").addEventListener("click", () => { void stopAndRewind(); });
 $("#timeline-back").addEventListener("click", () => { const target = Math.max(0, currentPosition() - 5); if (isMidiSong(selectedSong())) midiPlayer.seek(target); else { audio.currentTime = target; if (hasMidiLayer(selectedSong())) midiPlayer.seek(target); } drawTimelineEditor(); });
 $("#timeline-forward").addEventListener("click", () => { const target = Math.min(currentDuration(), currentPosition() + 5); if (isMidiSong(selectedSong())) midiPlayer.seek(target); else { audio.currentTime = target; if (hasMidiLayer(selectedSong())) midiPlayer.seek(target); } drawTimelineEditor(); });
+$("#timeline-rewind")?.addEventListener("click", () => { if (isMidiSong(selectedSong())) midiPlayer.seek(0); else audio.currentTime = 0; drawTimelineEditor(); });
+$("#timeline-ffw")?.addEventListener("click", () => { const target=Math.min(currentDuration(),currentPosition()+30); if (isMidiSong(selectedSong())) midiPlayer.seek(target); else audio.currentTime=target; drawTimelineEditor(); });
+$("#timeline-select")?.addEventListener("click", event => { event.currentTarget.classList.toggle('active'); toast('Modo de seleção multipista ativo.'); });
+$("#timeline-trim")?.addEventListener("click", () => { const song=selectedSong(); if(song){const updated={...song,timelineTrim:{start:0,end:currentPosition()}}; void dbPut(updated); state.songs[state.songs.findIndex(item=>item.id===song.id)]=updated; toast('Trim guardado como edição não destrutiva.');} });
+$("#timeline-cut")?.addEventListener("click", () => { const song=selectedSong(); if(song){const updated={...song,timelineCutAt:currentPosition()}; void dbPut(updated); state.songs[state.songs.findIndex(item=>item.id===song.id)]=updated; toast('Cut marcado na posição atual da faixa.');} });
 $("#timeline-convert-midi").addEventListener("click", exportTimelineMidi);
+document.addEventListener('dblclick', event => { const input=event.target.closest('input[type="range"]'); if(!input)return; const value=prompt('Introduzir valor',input.value); if(value===null)return; input.value=value; input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true})); });
 $("#timeline-save-lyrics").addEventListener("click", () => { $("#timeline-editor-modal").hidden = true; openLyricsEditor(); });
 $("#timeline-canvas").addEventListener("pointerdown", beginTimelinePointerEdit);
 $("#timeline-canvas").addEventListener("pointermove", (event) => { void moveTimelinePointerEdit(event); });
@@ -4904,7 +4912,11 @@ $('#ip-midi-start').onclick=async()=>{
   }catch(error){$('#ip-midi-start').disabled=false;toast(error.message);$('#ip-midi-status').textContent=error.message;}
 };
 $('#ip-midi-stop').onclick=async()=>{await networkMidi.stop();$('#ip-midi-start').disabled=false;$('#ip-midi-stop').disabled=true;$('#ip-midi-list').replaceChildren();$('#ip-midi-status').textContent='Desligado';};
-mainLyricsScreen=createLyricsScreen({host:$('#lyrics-stage'),viewport:$('#lyrics-content'),request:(action,data)=>requestScreen(action,'main',data)});
+mainLyricsScreen=createLyricsScreen({host:$('#lyrics-stage'),viewport:$('#lyrics-content'),request:(action,data)=>requestScreen(action,'main',data),navigation:{
+  setlist:()=>({title:'Setlist',items:state.setlist.map(id=>state.songs.find(song=>song.id===id)).filter(Boolean).map(song=>({id:song.id,title:song.title,current:song.id===state.currentId}))}),
+  library:()=>({title:'Biblioteca',items:state.songs.map(song=>({id:song.id,title:song.title,current:song.id===state.currentId}))}),
+  select:id=>selectSong(id)
+},onPaintState:painting=>{if(painting){mainLyricsScreen._resumePaint=isPlaying();if(mainLyricsScreen._resumePaint&&isPlaying())$('#play').click();}else if(mainLyricsScreen._resumePaint){mainLyricsScreen._resumePaint=false;setTimeout(()=>{if(!isPlaying())$('#play').click();},5000);}}});
 hostPublisher=setupHostSettings({container:$('.settings-modal'),outputs:()=>state.displayOutputs.map(o=>({id:o.id,name:o.name})),refresh:refreshMosaic});
 window.stageSetDesktop?.onHostRequest?.(({id,action,output,data})=>requestScreen(action,output,data,()=>window.stageSetDesktop.hostValidate(id)));
 attachEventInserter($('#lyrics-editor-text'),{root:$('.lyrics-editor-modal'),context:()=>({songId:editingLyricsSongId,output:editingLyricsOutput,position:currentPosition()}),save:(ctx,event)=>requestScreen('event-save',ctx.output,{songId:ctx.songId,event})});

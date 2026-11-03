@@ -25,24 +25,26 @@
         <div class="topbar-actions">
           <button class="backup-button" id="new-show" type="button" data-studio-only>Novo show</button>
           <details class="topbar-menu"><summary>Menu</summary><div class="topbar-menu-items">
-          <button class="backup-button" id="report-button" type="button" title="Imprimir ou exportar um relatório">Relatórios</button>
-          <button class="backup-button" id="setlist-save" type="button" data-studio-only title="Guardar setlist atual">Guardar setlist</button>
-          <button class="backup-button" id="setlist-load" type="button" data-studio-only title="Carregar setlist">Abrir setlist</button>
-          <input id="setlist-file" type="file" accept=".stagesetlist,.json,application/json" hidden />
-          <button class="backup-button" id="backup-export" type="button" data-studio-only title="Guardar o espetáculo completo, incluindo músicas e setlist">Guardar show</button>
           <span id="show-status" role="status">Show sem pasta</span>
+          <button class="backup-button" id="new-show-folder" type="button" data-studio-only>Criar pasta de show</button>
           <button class="backup-button" id="show-save-folder" type="button" data-studio-only>Guardar na pasta</button>
           <button class="backup-button" id="show-open-folder" type="button" data-studio-only>Abrir pasta de show</button>
-          <button class="backup-button" id="show-zip" type="button" data-studio-only>Exportar pasta ZIP</button>
           <button class="backup-button" id="backup-restore" type="button" data-studio-only title="Abrir um espetáculo guardado">Abrir show</button>
+          <button class="backup-button" id="backup-export" type="button" data-studio-only title="Guardar o espetáculo completo, incluindo músicas e setlist">Guardar show</button>
+          <button class="backup-button" id="setlist-load" type="button" data-studio-only title="Carregar setlist">Abrir setlist</button>
+          <button class="backup-button" id="setlist-save" type="button" data-studio-only title="Guardar setlist atual">Guardar setlist</button>
+          <button class="backup-button" id="show-zip" type="button" data-studio-only>Exportar pasta ZIP</button>
+          <button class="backup-button" id="report-button" type="button" title="Imprimir ou exportar um relatório">Relatórios</button>
+          <input id="setlist-file" type="file" accept=".stagesetlist,.json,application/json" hidden />
           <input id="backup-file" type="file" accept=".stagebackup,application/octet-stream" hidden />
           </div></details>
           <button class="backup-button mode-toggle" id="studio-mode-toggle" type="button" aria-pressed="false">Entrar no Studio</button>
           <button class="icon-button" id="help-button" title="Atalhos de teclado" aria-label="Atalhos de teclado">?</button>
           <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
+          <button class="backup-button" id="hosts-button" type="button" title="Hosts ligados ou visíveis">Hosts</button>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.17</span>
+          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.18</span>
         </div>
       </header>
 
@@ -278,7 +280,7 @@
               <label class="lyrics-color-control">Foco <input id="lyrics-output-highlight" type="color" value="#65e2c1" aria-label="Cor de destaque desta saída" /></label>
               <span class="lyrics-shortcut-status" id="lyrics-shortcut-status">Sem atalho</span>
             </div>
-            <div class="lyrics-timestamp-tools lyrics-bpm-row"><label for="lyrics-bpm">BPM</label><input id="lyrics-bpm" type="number" min="20" max="300" step="0.1" placeholder="120" /><span>Andamento da exportação MIDI/KAR</span><button class="backup-button" id="lyrics-import-tempo" type="button">Importar BPM MIDI/KAR</button><input id="lyrics-tempo-file" type="file" accept=".mid,.midi,.kar" hidden /></div>
+            <div class="lyrics-timestamp-tools lyrics-bpm-row"><label for="lyrics-bpm">BPM</label><input id="lyrics-bpm" type="number" min="20" max="300" step="0.1" placeholder="120" /><span>Andamento da exportação MIDI/KAR</span><button class="backup-button" id="lyrics-import-tempo" type="button">Importar BPM MIDI/KAR</button><button class="backup-button" id="lyrics-insert-event" type="button">＋ Inserir evento…</button><input id="lyrics-tempo-file" type="file" accept=".mid,.midi,.kar" hidden /></div>
             <label class="lyrics-editor-field" for="lyrics-editor-text">Texto das letras</label>
             <div class="lyrics-editor-surface">
               <div id="lyrics-editor-preview" class="lyrics-editor-preview" aria-hidden="true"></div>
@@ -313,7 +315,7 @@
             <label>Valor CC <input id="timeline-cc-value" type="range" min="0" max="127" value="64" /><output id="timeline-cc-value-label">64</output></label>
             <button class="backup-button" id="timeline-add-cc" type="button">Adicionar ponto CC</button>
             <div class="timeline-zoom-controls"><button class="backup-button" id="timeline-zoom-out" type="button" aria-label="Reduzir zoom">−</button><span id="timeline-zoom-label">100%</span><button class="backup-button" id="timeline-zoom-in" type="button" aria-label="Aumentar zoom">+</button></div>
-            <div class="timeline-transport"><button class="backup-button" id="timeline-back" type="button" title="Recuar 5 segundos">◀ 5</button><button class="backup-button" id="timeline-stop" type="button">Stop</button><button class="backup-button" id="timeline-play" type="button">▶</button><button class="backup-button" id="timeline-pause" type="button">Ⅱ</button><button class="backup-button" id="timeline-forward" type="button" title="Avançar 5 segundos">5 ▶</button></div>
+            <div class="timeline-transport"><button class="backup-button" id="timeline-rewind" type="button" title="Recuar para o início">◀◀</button><button class="backup-button" id="timeline-back" type="button" title="Recuar 5 segundos">◀ 5</button><button class="backup-button" id="timeline-stop" type="button">Stop</button><button class="backup-button" id="timeline-play" type="button">▶</button><button class="backup-button" id="timeline-pause" type="button">Ⅱ</button><button class="backup-button" id="timeline-forward" type="button" title="Avançar 5 segundos">5 ▶</button><button class="backup-button" id="timeline-ffw" type="button" title="Avançar 30 segundos">▶▶</button><button class="backup-button" id="timeline-select" type="button">Selecionar</button><button class="backup-button" id="timeline-trim" type="button">Trim</button><button class="backup-button" id="timeline-cut" type="button">Cut</button></div>
             <button class="backup-button" id="timeline-convert-midi" type="button">Exportar Piano Roll MIDI</button>
             <button class="backup-button" id="timeline-save-lyrics" type="button">Editar / guardar letras</button>
             <span id="timeline-position">0:00</span>

@@ -1,6 +1,6 @@
 {
   "name": "stage-set",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Windows setlist, lyrics and karaoke player",
   "private": true,
   "type": "module",
@@ -49,6 +49,7 @@
       ],
       "artifactName": "StageSet-${version}-${arch}.${ext}"
     },
+    "icon": null,
     "portable": {
       "artifactName": "StageSet-${version}-Portable-${arch}.${ext}"
     },

@@ -22,7 +22,7 @@ control('auto').onchange=saveSync;control('offset').oninput=saveSync;
 control('reset').onclick=()=>{sync={automatic:true,offset:0};store('host-sync',sync);updateNetwork();paintFrame();};updateNetwork();
 const fontKey=()=>frame?frame.output+':'+frame.songId:'';
 const fontSize=()=>Math.max(14,Math.min(120,Number(fonts[fontKey()])||Number(frame?.fontSize)||42));
-const screen=createLyricsScreen({host:stage,viewport,extraControls:network,fontControl:{get:fontSize,set:value=>{if(!frame)return;const key=fontKey();delete fonts[key];if(value!==null)fonts[key]=value;fonts=Object.fromEntries(Object.entries(fonts).slice(-300));clearTimeout(fontTimer);fontTimer=setTimeout(()=>store('host-fonts',fonts),200);paintFrame();}},request:async(action,data)=>{
+const screen=createLyricsScreen({host:stage,viewport,extraControls:network,fontControl:{get:fontSize,set:value=>{if(!frame)return;const key=fontKey();delete fonts[key];if(value!==null)fonts[key]=value;fonts=Object.fromEntries(Object.entries(fonts).slice(-300));clearTimeout(fontTimer);fontTimer=setTimeout(()=>store('host-fonts',fonts),200);paintFrame();}},onPaintState:painting=>{if(!painting)return;viewport.querySelectorAll('video').forEach(v=>v.pause());setTimeout(()=>{if(frame?.playing)paintFrame();},5000);},request:async(action,data)=>{
   if(action==='preferences'){preferences=data.preferences;store('host-overlay',preferences);return preferences;}
   if(action==='drawing-read'&&frame?.readOnly)return frame?.drawing||{revision:0,strokes:[]};
   if(!frame||!token)throw Error('Sem ligação. O rascunho continua neste dispositivo.');

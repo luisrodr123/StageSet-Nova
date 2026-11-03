@@ -51,6 +51,7 @@ export function attachEventInserter(textarea,{context,save,root}){
   field('kind').onchange=update;field('message').onchange=update;update();
   textarea.addEventListener('contextmenu',event=>{if(!context()?.songId)return;event.preventDefault();event.stopPropagation();selection=textarea.selectionStart;selectionEnd=textarea.selectionEnd;menu.hidden=false;menu.style.left='12px';menu.style.top='12px';});
   menu.querySelector('button').onclick=()=>{pinned=context();if(!pinned?.songId){menu.hidden=true;return;}field('time').value=(pinned.position||0).toFixed(2);menu.hidden=true;dialog.hidden=false;dialog.querySelector('[role=status]').textContent='';};
+  root.querySelector('#lyrics-insert-event')?.addEventListener('click',()=>{pinned=context();if(!pinned?.songId)return;field('time').value=(pinned.position||0).toFixed(2);dialog.hidden=false;dialog.querySelector('[role=status]').textContent='';});
   dialog.addEventListener('keydown',e=>e.stopPropagation());dialog.querySelector('[data-action=cancel]').onclick=()=>{if(!busy)dialog.hidden=true;};
   dialog.querySelector('[data-action=insert]').onclick=async()=>{
     if(busy)return;busy=true;const button=dialog.querySelector('[data-action=insert]');button.disabled=true;

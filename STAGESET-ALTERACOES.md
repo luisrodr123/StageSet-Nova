@@ -1,5 +1,18 @@
 # StageSet — alterações anotadas
 
+## Versão 0.18.0 — em desenvolvimento
+
+- Ecrã inteiro passou a oferecer Setlist e Biblioteca laterais, com títulos sempre legíveis e layout elástico.
+- Barra de ferramentas dos ecrãs ganhou ativação por janela, guardar snapshot identificado por saída, PDF, desenho com pausa e retoma automática após 5 segundos.
+- Inserção de eventos MIDI/Imagem/DMX/Vídeo ficou disponível diretamente junto de “Importar BPM MIDI/KAR”.
+- Saídas de letras passaram a ter botão individual Ativar/Desativar; menu Hosts abre a área de clientes visíveis/autorizados.
+- Mixer usa disposição horizontal de mesa e botões Mute/Unmute; editor multipista ganhou rewind, avanço rápido, seleção, Trim e Cut não destrutivos.
+- Menu de show foi reorganizado e inclui Criar pasta de show; todos os campos de faixa permitem edição manual por duplo clique.
+- Guardar janela cria `.stageset-window.json` com nome da janela, letra, música e anotações.
+
+Validação local: `npm run check` passou. A suite `npm test` mantém falhas de rede/loopback e renomeação EPERM específicas do ambiente sandbox; não são introduzidas por esta alteração e devem ser repetidas no Windows normal antes da publicação.
+
+
 ## 2026-11-03 — versão 0.17.0
 
 - Hosts Android, iPad/web e Windows: edição de letras ligada à biblioteca do StageSet, por música e saída; Studio e proteção de conflitos preservados. O rascunho não substitui alterações concorrentes nem outra música/saída.
