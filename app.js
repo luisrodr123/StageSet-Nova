@@ -1918,7 +1918,8 @@ async function importSetlistFile(file) {
   try {
     if (file.size > 5 * 1024 * 1024) throw new Error("O ficheiro de setlist excede 5 MB.");
     const data = JSON.parse(await file.text());
-    if (data?.format !== "StageSet Setlist" || data.version !== 1 || !Array.isArray(data.entries)) throw new Error("Este ficheiro não é uma setlist StageSet compatível.");
+    if (data?.format !== "StageSet Setlist" && !Array.isArray(data.entries) && !Array.isArray(data.setlist)) throw new Error("Este ficheiro não é uma setlist StageSet compatível.");
+    if (!Array.isArray(data.entries)) data.entries = (data.setlist || []).map(item => typeof item === 'string' ? ({id:item}) : item);
     if (state.setlist.length && !window.confirm("Substituir a setlist atual pela setlist carregada?")) return;
     const used = new Set();
     const idMap = new Map();
@@ -1927,7 +1928,7 @@ async function importSetlistFile(file) {
     const changedSongs = [];
     for (const entry of data.entries) {
       const candidates = state.songs.filter((song) => !used.has(song.id));
-      let song = candidates.find((item) => item.id === entry.id && item.fileName === entry.fileName);
+      let song = candidates.find((item) => item.id === entry.id && (!entry.fileName || item.fileName === entry.fileName));
       if (!song) song = candidates.find((item) => item.fileName === entry.fileName && item.title === entry.title && (item.artist ?? "") === (entry.artist ?? ""));
       if (!song) { missing++; continue; }
       used.add(song.id);

@@ -90,12 +90,23 @@ function readAsset(file, descriptor, payloadOffset) {
   return { blob: file.slice(start, end, type), range: [descriptor.offset, descriptor.offset + descriptor.size] };
 }
 
+async function readLegacyJsonBackup(file) {
+  if (file.size > MAX_HEADER_SIZE) throw new Error("A cópia antiga excede o limite de metadados suportado.");
+  let data; try { data = JSON.parse(await file.text()); } catch { throw new Error("Este ficheiro não é uma cópia StageSet reconhecida."); }
+  const rawSongs = Array.isArray(data?.songs) ? data.songs : Array.isArray(data?.library) ? data.library : [];
+  if (!rawSongs.length) throw new Error("A cópia antiga não contém uma biblioteca de músicas.");
+  const toBlob = value => { if (value instanceof Blob) return value; if (typeof value !== 'string' || !value.startsWith('data:')) return null; const [head,encoded]=value.split(',',2); if(!encoded)return null; const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)); return new Blob([bytes],{type:head.slice(5).split(';')[0]||'application/octet-stream'}); };
+  const songs = rawSongs.map((entry,index)=>{const song={...entry};song.id=typeof song.id==='string'&&song.id?song.id:`legacy-${index+1}`;song.title=String(song.title||song.name||`Tema ${index+1}`);song.fileName=String(song.fileName||song.filename||`${song.title}.mp3`);song.audioBlob=toBlob(song.audioBlob||song.audio||song.data);song.midiBlob=toBlob(song.midiBlob);song.cdgBlob=toBlob(song.cdgBlob);delete song.audio;delete song.data;return song;});
+  if(songs.some(song=>!(song.audioBlob instanceof Blob)))throw new Error("A cópia antiga não contém áudio incorporado; importa os ficheiros originais e depois carrega a setlist.");
+  const ids=new Set(songs.map(song=>song.id)),prefs=data.preferences||data;return {songs,setlist:Array.isArray(prefs.setlist)?prefs.setlist.filter(id=>ids.has(id)):[],playedSongIds:Array.isArray(prefs.playedSongIds)?prefs.playedSongIds.filter(id=>ids.has(id)):[],quickies:Array.isArray(prefs.quickies)?prefs.quickies:Array(9).fill(null),currentId:ids.has(prefs.currentId)?prefs.currentId:null,autoScroll:true,hideSetlistDuringPlayback:Boolean(prefs.hideSetlistDuringPlayback),interSongDelay:Number(prefs.interSongDelay)||0,volume:Number.isFinite(prefs.volume)?prefs.volume:.8,setlistCcConfig:prefs.setlistCcConfig||{enabled:false,type:'cc',channel:0,number:20},pedalMappings:prefs.pedalMappings||null,interfaceSettings:prefs.interfaceSettings||{}};
+}
+
 export async function readBackup(file) {
   if (file.size < PREFIX_SIZE || file.size > MAX_BACKUP_SIZE) throw new Error("O tamanho do ficheiro de cópia não é suportado.");
   const prefix = await file.slice(0, PREFIX_SIZE).arrayBuffer();
   const view = new DataView(prefix);
   const magic = new TextDecoder().decode(new Uint8Array(prefix, 0, 8));
-  if (magic !== MAGIC) throw new Error("Este ficheiro não é uma cópia StageSet válida.");
+  if (magic !== MAGIC) return readLegacyJsonBackup(file);
   const headerSize = view.getUint32(8, true);
   if (!headerSize || headerSize > MAX_HEADER_SIZE || PREFIX_SIZE + headerSize > file.size) {
     throw new Error("O cabeçalho da cópia está inválido.");
@@ -107,7 +118,7 @@ export async function readBackup(file) {
   } catch {
     throw new Error("Não foi possível ler os metadados da cópia.");
   }
-  if (manifest?.version !== 1 || !Array.isArray(manifest.songs) || manifest.songs.length > MAX_SONGS) {
+  if ((!Number.isInteger(manifest?.version) || manifest.version < 0 || manifest.version > 1) || !Array.isArray(manifest.songs) || manifest.songs.length > MAX_SONGS) {
     throw new Error("A versão ou a biblioteca desta cópia não é suportada.");
   }
 
