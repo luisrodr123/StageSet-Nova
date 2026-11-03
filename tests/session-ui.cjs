@@ -3,6 +3,8 @@ module.exports=async({url,children})=>{
   const fs=require('node:fs/promises'),folderParent=await fs.mkdtemp(path.join(require('node:os').tmpdir(),'stageset-show-ui-')),folder=new (require('../desktop/show-folder.cjs').ShowFolder)(path.join(folderParent,'profile/active.json'));let originalBackup;
   for(const [name,fn] of Object.entries({info:()=>folder.info(),create:(name,previous)=>{originalBackup=previous;return folder.create(folderParent,name,previous);},save:s=>folder.save(s),open:()=>folder.open(folder.root),zip:()=>folder.zip(path.join(folderParent,'show.zip')),detach:async()=>{await folder.queue;folder.root=null;await fs.writeFile(folder.config,'{}');}}))ipcMain.handle('test-show-'+name,(_, ...args)=>fn(...args));
   const {HostServer}=require('../desktop/host-server.cjs'),host=new HostServer();let dmxConfig;const cues=[];
+  host.access=new (require('../desktop/host-access.cjs').HostAccess)(path.join(folderParent,'host-access.json'));
+  for(const [name,fn] of Object.entries({authInfo:()=>host.access.info(),authPassword:async value=>{await host.access.setPassword(value);host.revoke();return host.access.info();},authForget:async()=>{await host.access.forget();host.revoke();return host.access.info();}}))ipcMain.handle('test-host-'+name,(_, ...args)=>fn(...args));
   for(const [name,fn] of Object.entries({start:config=>host.start(config,process.env.STAGESET_TEST_ROOT||path.resolve(__dirname,'..')),stop:()=>host.stop(),clients:()=>host.list(),assign:(id,output)=>host.assign(id,output),publish:(id,frame)=>host.publish(id,frame)}))ipcMain.handle('test-host-'+name,(_, ...args)=>fn(...args));
   ipcMain.handle('test-dmx-start',(_,config)=>{dmxConfig=config;});ipcMain.handle('test-dmx-cue',(_,event)=>{cues.push(event);});
   let config,feedback='',published,choice,handoff,publications=0;
@@ -14,6 +16,7 @@ module.exports=async({url,children})=>{
   ipcMain.handle('test-session-feedback',(_,value)=>{feedback=value;});
   ipcMain.handle('test-session-state',(_,value)=>{published=value;publications++;});
   const win=new BrowserWindow({show:false,width:1273,height:930,webPreferences:{preload:path.join(__dirname,'session-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});children.push(win);
+  require('../desktop/host-requests.cjs')(ipcMain,host,()=>win,event=>event.sender===win.webContents,'test-host');
   await win.loadURL(url);
   const evalJs=code=>win.webContents.executeJavaScript(`(async()=>{${code}})()`,true);
   const until=async fn=>{for(let i=0;i<100;i++){if(await fn())return;await new Promise(r=>setTimeout(r,30));}throw Error('Session UI timeout, feedback: '+feedback);};
@@ -64,6 +67,7 @@ module.exports=async({url,children})=>{
     await evalJs(`const select=document.querySelector('[data-host=interface]');select.add(new Option('Loopback teste','127.0.0.1'));select.value='127.0.0.1';document.querySelector('[data-host=port]').value=${await require('./local-port.cjs')()};document.querySelector('[data-host=start]').click();`);
     await until(()=>host.server?.listening&&host.frames.size>0);
     if(!host.frames.get('2')?.lines.some(line=>line.includes('[stage:')))throw Error('Host publisher lost event lyrics');
+    await require('./host-interactive-ui.cjs')({win,host,children});
     await evalJs(`document.querySelector('[data-dmx=start]').click();document.getElementById('close-settings').click();document.getElementById('progress').value='0';document.getElementById('progress').dispatchEvent(new Event('input'));document.getElementById('play').click();`);
     await until(()=>cues.some(e=>e.channel===42&&e.value===200));
     if(!dmxConfig?.interfaceAddress)throw Error('DMX interface was not selected');

@@ -20,7 +20,7 @@ ZIP padrão, sem ZIP64 e sem compressão adicional; limite de 2 GB para exporta�
 
 ## Host portátil Windows para teste
 
-Executar `StageSet-Host-0.16.0-Portable-x64.exe` no PC recetor. No StageSet principal: **Configurações → StageSet Host → Ativar recetores**. Copiar o endereço mostrado para o aplicativo Host, carregar **Ligar**, indicar o nome do PC e o código da sessão. Atribuir a saída na lista de recetores do StageSet principal.
+Executar `StageSet-Host-0.17.0-Portable-x64.exe` no PC recetor. No StageSet principal: **Configurações → StageSet Host → Ativar recetores**. Copiar o endereço mostrado para o aplicativo Host, carregar **Ligar**, indicar o nome do PC e o código da sessão. Atribuir a saída na lista de recetores do StageSet principal.
 
 Funciona em paralelo com outros recetores no browser. HTTP é suficiente para o aplicativo Windows na LAN; HTTPS exige certificado confiado, tal como no browser. O aplicativo não ignora erros de certificado. F11 ou o botão do ecrã de letras ativa fullscreen. Para mudar de servidor, usar o menu Ligação (Alt revela a barra de menus).
 

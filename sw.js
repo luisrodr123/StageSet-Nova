@@ -1,4 +1,4 @@
-const CACHE_NAME = "stageset-shell-v21";
+const CACHE_NAME = "stageset-shell-v22";
 const APP_SHELL = [
   "./show-project.js",
   "./zip-store.js",

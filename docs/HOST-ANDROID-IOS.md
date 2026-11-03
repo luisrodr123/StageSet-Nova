@@ -1,4 +1,22 @@
-# StageSet Host 0.16 — Android, iPhone e iPad
+# StageSet Host 0.17 — Android, iPhone e iPad
+
+## Atualizar e usar as novas funções
+
+Atualizar primeiro o **StageSet principal para 0.17.0**, ativar os recetores e voltar a abrir o Host no tablet. A interface é fornecida pelo computador principal: atualizar só o APK não atualiza um servidor antigo. A versão web continua disponível no iPad; o ZIP iOS contém um projeto Xcode, não um IPA instalável.
+
+- **Editar letras:** no menu **Ecrã**, escolher **Editar letras**. O computador principal tem de estar em **Studio**, com o editor principal fechado. Guardar altera apenas a saída atribuída e conserva os timestamps; se outra janela alterou a letra, o rascunho fica disponível para copiar, sem substituir a versão mais recente.
+- **Desenhar:** ativar **Desenhar**, escolher cor/espessura e usar um dedo ou caneta. Os traços acompanham as linhas e são guardados no show, por música e saída. Há borracha, anular e limpar.
+- **Tamanho:** **A− / A+**, cursor de tamanho ou gesto de pinça sobre a letra. Dois dedos ajustam o tamanho mesmo com o desenho ativo. A preferência fica neste dispositivo por música/saída; **Tamanho do StageSet** repõe o valor do computador principal.
+- **Wi-Fi:** no menu **Sincronização Wi-Fi**, deixar **Compensação automática** ativa. O ajuste de −1000 a +1000 ms atrasa ou adianta as letras temporizadas; **Sem atraso adicional** repõe zero. O indicador mostra ida e volta da ligação. Não modifica o áudio nem torna a rede fisicamente instantânea. Letras sem timestamps continuam a seguir o foco recebido do StageSet.
+- **Setlist:** aparece à esquerda, destaca a música atual e identifica as já tocadas. Escolher **Sempre visível** ou **Ocultar após…**, entre 1 e 300 segundos. O botão **Setlist** volta a abrir/recolher a lista; em modo automático, uma mudança de música volta a mostrá-la. Preferências independentes em cada Host. A lista é de consulta; selecionar/reproduzir músicas continua no StageSet.
+
+## Palavra-passe e ligação automática
+
+Em **Configurações → StageSet Host → Autorização dos Hosts**, escrever a nova palavra-passe e clicar **Guardar palavra-passe**. Pode voltar a **Usar código de sessão** ou **Revogar dispositivos guardados**. Mudar a palavra-passe revoga as autorizações anteriores.
+
+Na primeira ligação do tablet, introduzir a palavra-passe (ou o código temporário) e deixar **Recordar este dispositivo e ligar automaticamente** marcado. A autorização e a saída atribuída são recuperadas nas ligações seguintes, incluindo depois de reiniciar o servidor. O StageSet tem de estar aberto com os recetores ativos. Os aplicativos nativos recordam o endereço e têm **Ligar automaticamente ao abrir**; o botão Casa/Outro servidor permite alterá-lo. A PWA instalada abre o endereço em que foi instalada.
+
+A palavra-passe é guardada como hash no computador principal. O Host guarda uma credencial revogável, não a palavra-passe. Estas autorizações não entram no ZIP do show, no backup da biblioteca nem no GitHub. **Ecrã → Esquecer autorização neste dispositivo** remove a autorização local; no StageSet pode revogar todos. Se o IP/porta/endereço mudar, atualizar o endereço e autorizar novamente nessa origem. Em HTTPS, continua a ser necessário confiar no certificado.
 
 O Host recebe letras, foco, fundos, desenhos e multimédia de uma saída do StageSet. Não necessita das músicas no dispositivo e não controla o transporte do computador. As versões web e nativas usam o mesmo servidor e podem funcionar em paralelo.
 
@@ -11,7 +29,7 @@ O Host recebe letras, foco, fundos, desenhos e multimédia de uma saída do Stag
 
 ## Android: APK de teste
 
-Descarregar `StageSet-Host-0.16.0-Android-Test.apk` para o telemóvel ou tablet Android 8 ou posterior e abrir. Quando o Android pedir, permitir a instalação a partir do browser/gestor de ficheiros usado. Abrir **StageSet Host**, escrever o endereço do computador e carregar **Ligar ao StageSet**.
+Descarregar `StageSet-Host-0.17.0-Android-Test.apk` para o telemóvel ou tablet Android 8 ou posterior e abrir. Quando o Android pedir, permitir a instalação a partir do browser/gestor de ficheiros usado. Abrir **StageSet Host**, escrever o endereço do computador e carregar **Ligar ao StageSet**.
 
 Funciona em retrato e paisagem. O ecrã mantém-se ligado durante a receção, as barras do sistema recolhem-se e o botão Casa regressa à escolha de servidor. Os controlos de letras estão no menu sobreposto. Exportar PDF abre a escolha de destino do Android (até 30 MB).
 
@@ -35,7 +53,7 @@ Referência Apple: [Transformar um site numa aplicação no iPad](https://suppor
 
 O projeto `mobile/ios` é universal (famílias iPhone e iPad), iOS/iPadOS 16 ou posterior. Inclui WKWebView, ligação HTTP/HTTPS, autorização de rede local, retrato/paisagem, botão Casa e partilha de PDF. Mantém o ecrã acordado enquanto está ligado. Não altera nem ignora a validação TLS.
 
-Para instalar num dispositivo físico é necessária assinatura Apple; um ZIP de código ou um binário de simulador não é um IPA instalável. Esta distribuição inclui `StageSet-Host-0.16.0-iOS-Project.zip`, para preparar no Mac:
+Para instalar num dispositivo físico é necessária assinatura Apple; um ZIP de código ou um binário de simulador não é um IPA instalável. Esta distribuição inclui `StageSet-Host-0.17.0-iOS-Project.zip`, para preparar no Mac:
 
 ```sh
 brew install xcodegen

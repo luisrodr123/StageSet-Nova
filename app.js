@@ -1232,13 +1232,13 @@ function outputWindowName(output) { return 'stageset-lyrics-' + output.id; }
 
 function outputLyricFrame(song, output, fallback, fallbackIndex, timestamps = false) {
   const raw = song ? editorLyricsFor(song, output.id) : '';
-  if (!raw && !Object.hasOwn(song?.lyricOutputLyrics ?? {}, output.id)) return { lines: fallback.map(line => timestamps ? line : line.replace(/\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*/g, '')), currentIndex: fallbackIndex };
+  if (!raw && !Object.hasOwn(song?.lyricOutputLyrics ?? {}, output.id)) return { lines: fallback.map(line => timestamps ? line : line.replace(/\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*/g, '')), currentIndex: fallbackIndex,lineTimes:null };
   const parsed = parseLyrics(raw || '');
   const timed = withEventRows(raw,parsed.timeLines.length ? parsed.timeLines : midiData?.barBeatToSeconds ? parsed.barBeatLines.map(line => ({...line, time:midiData.barBeatToSeconds(line.bar,line.beat)})) : [],song?.lyricEvents);
   const source = (raw || '').split(/\r?\n/);
   const all = timed.length ? timed.map(line => timestamps ? source[line.sourceIndex] : line.text) : source.filter(line => !isEmbeddedMidiTag(line));
   const active = timed.length ? timed.reduce((found,line,index) => line.time <= currentPosition() ? index : found, -1) : state.autoScroll && currentDuration() ? Math.min(all.length-1, Math.floor(currentPosition()/currentDuration()*all.length)) : Math.min(all.length-1,state.manualLyricOffset);
-  return {lines:all.map(line=>transposeLyricLine(line,song?.transpose||0)), currentIndex:active};
+  return {lines:all.map(line=>transposeLyricLine(line,song?.transpose||0)), currentIndex:active,lineTimes:timed.length?timed.map(line=>line.time):null};
 }
 
 function broadcastLyricWindows(lines, currentIndex = -1) {
@@ -1246,8 +1246,8 @@ function broadcastLyricWindows(lines, currentIndex = -1) {
   if (state.mosaicWindow && !state.mosaicWindow.closed) state.mosaicWindow.postMessage({type:'stageset-mosaic-outputs', outputs:state.displayOutputs.map(output=>output.id)}, location.origin);
   state.displayOutputs.forEach((output,index) => {
     const prefs = lyricOutputSettings(song,output.id);
-    const common = {...screenContext(song,output.id),displays:availableDisplays,desktop:!!window.stageSetDesktop,displayId:output.displayId||'',output:output.id,name:output.name,color:prefs.highlightColor||output.color,baseColor:output.color,fontSize:Number(prefs.fontSize)||42,visible:output.mosaicVisible!==false};
-    if(hostPublisher?.active){const frame=outputLyricFrame(song,output,lines,currentIndex,false);hostPublisher.publish(output.id,{...common,...frame,htmlLines:frame.lines.map(coloredLyricHtml),background:output.background,events:song?.lyricEvents||[],drawing:song?.lyricAnnotations?.[output.id]||{revision:0,strokes:[]}});}
+    const common = {...screenContext(song,output.id),playbackRate:song?.tempo||1,displays:availableDisplays,desktop:!!window.stageSetDesktop,displayId:output.displayId||'',output:output.id,name:output.name,color:prefs.highlightColor||output.color,baseColor:output.color,fontSize:Number(prefs.fontSize)||42,visible:output.mosaicVisible!==false};
+    if(hostPublisher?.active){const frame=outputLyricFrame(song,output,lines,currentIndex,false);hostPublisher.publish(output.id,{...common,...frame,setlist:state.setlist.map(id=>{const item=state.songs.find(s=>s.id===id);return item?{id,title:item.title,played:state.playedSongIds.has(id)}:null;}).filter(Boolean),htmlLines:frame.lines.map(coloredLyricHtml),background:output.background,events:song?.lyricEvents||[],drawing:song?.lyricAnnotations?.[output.id]||{revision:0,strokes:[]}});}
     const send = (ref,type,withTimes) => {
       if(!ref||ref.closed)return;
       let sent=sentBackgrounds.get(ref);if(!sent){sent=new Map();sentBackgrounds.set(ref,sent);}
@@ -2257,9 +2257,10 @@ function screenContext(song, target) {
   return {songId:song?.id||'', title:song?.title||'', position:currentPosition(),playing:isPlaying(),canEdit:state.mode==='studio'&&!!song&&!isDocumentSong(song), annotationVersion:song?.lyricAnnotations?.[target]?.revision||0, overlay:screenPreferences(overlay)};
 }
 let screenRequests = Promise.resolve();
-function requestScreen(action, target, data = {}) {
+function requestScreen(action, target, data = {}, guard) {
   // Serialize screen writes so two windows cannot overwrite each other's drawings/lyrics.
   const task=screenRequests.then(async()=>{
+    if(guard&&!await guard())throw Error('A música ou a saída mudou. O rascunho continua no recetor.');
     const output=state.displayOutputs.find(item=>item.id===target);
     if(target!=='main'&&!output)throw Error('Esta saída já não existe.');
     if(action==='preferences'){
@@ -3250,6 +3251,7 @@ async function deleteLibrarySong(id) {
 }
 
 function renderSetlist() {
+  if(hostPublisher?.active)refreshMosaic();
   const container = $("#setlist-items");
   container.innerHTML = "";
   state.setlist.forEach((id, index) => {
@@ -4904,6 +4906,7 @@ $('#ip-midi-start').onclick=async()=>{
 $('#ip-midi-stop').onclick=async()=>{await networkMidi.stop();$('#ip-midi-start').disabled=false;$('#ip-midi-stop').disabled=true;$('#ip-midi-list').replaceChildren();$('#ip-midi-status').textContent='Desligado';};
 mainLyricsScreen=createLyricsScreen({host:$('#lyrics-stage'),viewport:$('#lyrics-content'),request:(action,data)=>requestScreen(action,'main',data)});
 hostPublisher=setupHostSettings({container:$('.settings-modal'),outputs:()=>state.displayOutputs.map(o=>({id:o.id,name:o.name})),refresh:refreshMosaic});
+window.stageSetDesktop?.onHostRequest?.(({id,action,output,data})=>requestScreen(action,output,data,()=>window.stageSetDesktop.hostValidate(id)));
 attachEventInserter($('#lyrics-editor-text'),{root:$('.lyrics-editor-modal'),context:()=>({songId:editingLyricsSongId,output:editingLyricsOutput,position:currentPosition()}),save:(ctx,event)=>requestScreen('event-save',ctx.output,{songId:ctx.songId,event})});
 showProject=setupShowProject({snapshot:async()=>({backup:currentShowBackup(),files:await showFiles(state.songs)}),clear:clearLibraryContents,restore:restoreBackupFile,allow:requireStudio,notify:toast});
 initialize().then(()=>showProject.ready()).catch(e=>toast(e.message));

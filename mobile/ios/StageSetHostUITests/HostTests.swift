@@ -12,7 +12,7 @@ final class HostTests: XCTestCase {
         let name = page.textFields["Nome deste dispositivo"]
         XCTAssertTrue(name.waitForExistence(timeout: 15))
         name.tap(); name.typeText("iPad test\n")
-        let code = page.textFields["Código apresentado no StageSet"]
+        let code = page.secureTextFields["Palavra-passe ou código do StageSet"]
         XCTAssertTrue(code.waitForExistence(timeout: 10))
         code.typeText("stageset-test\n")
         XCTAssertTrue(page.staticTexts["StageSet mobile test"].waitForExistence(timeout: 15))

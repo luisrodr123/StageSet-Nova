@@ -1,5 +1,21 @@
 # StageSet — alterações anotadas
 
+## 2026-11-03 — versão 0.17.0
+
+- Hosts Android, iPad/web e Windows: edição de letras ligada à biblioteca do StageSet, por música e saída; Studio e proteção de conflitos preservados. O rascunho não substitui alterações concorrentes nem outra música/saída.
+- Desenho por toque/caneta com traços presos às linhas, borracha, anular e gravação no show. Dois dedos ajustam a letra sem deixar um traço acidental.
+- Tamanho por A−/A+, cursor e pinça. Preferência local por música/saída e botão para repor o tamanho definido no StageSet.
+- Wi-Fi: removida a consulta fixa a cada 500 ms. O servidor responde aos pedidos pendentes logo que há alterações, envia deltas e evita repetir imagens/letras a cada atualização de posição. Relógio local com compensação de ida/volta e ajuste manual de −1000 a +1000 ms para letras temporizadas; não altera o áudio.
+- Palavra-passe Host configurável no StageSet, guardada como hash scrypt. Opção Recordar dispositivo, autorização revogável sem guardar a palavra-passe no recetor, recuperação automática da saída após reconexão/reinício. Revogar todos ou esquecer um dispositivo. Credenciais ficam fora dos shows e do GitHub.
+- Aplicativos recordam o endereço e permitem ligação automática ao abrir. Mantidas as opções Casa/Outro servidor e validação normal de certificados HTTPS.
+- Setlist lateral nos Hosts com música atual/tocadas, sempre visível ou ocultação após 1–300 s. Botão para abrir/recolher, preferência por dispositivo e atualização durante o espetáculo.
+- Guia móvel, instruções de continuidade, versões da interface e caches atualizados. É necessário atualizar o StageSet principal e reabrir os Hosts para receber a interface nova.
+
+Validação: `npm run check`, 29 testes unitários/rede e suite Electron completos aprovados. Testada gravação HTTP → IPC → IndexedDB, preservação da letra principal, desenho tátil ancorado, gesto de pinça real no Chromium, tamanho local, compensação sem alterar transporte, setlist/temporizador, palavra-passe pelo menu e reconexão após recarregar. Testes de autorização incluem reinício do servidor, recuperação da saída, revogação e ausência de palavras-passe/tokens em claro no ficheiro do servidor. APK e testes Android compilados; lint aprovado.
+
+Limites: a compensação reduz a espera introduzida pela aplicação, mas não elimina a latência física nem mede a latência do áudio. Ensaio em tablets físicos e na rede Wi-Fi do espetáculo ainda necessário. Edição exige Studio no principal; consulta da setlist não controla reprodução. No iPad mantém-se a versão web; o projeto nativo necessita de compilação/assinatura Apple. A reconexão automática usa o mesmo endereço/origem e requer o servidor ativo.
+
+
 ## 2026-11-02 — versão 0.16.0
 
 - Corrigido o Host portátil que terminava sem janela: o lançador passa a extrair diretamente os ficheiros, evitando a falha observada no caminho de extração 7z. Janela mostrada após carregar; erro de arranque apresentado e perfil Host separado da biblioteca StageSet.

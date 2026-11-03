@@ -5,7 +5,7 @@ function receiverUrl(value){const url=new URL(value);if(!['http:','https:'].incl
 app.whenReady().then(async()=>{
  session.defaultSession.setPermissionRequestHandler((contents,permission,done)=>done(permission==='fullscreen'&&contents.getURL().startsWith(origin+'/')));
  session.defaultSession.setPermissionCheckHandler((_,permission,requestOrigin)=>permission==='fullscreen'&&requestOrigin===origin);
- home=new BrowserWindow({show:false,width:540,height:420,minWidth:380,minHeight:340,autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'host-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});home.on('closed',()=>{home=null;});
+ home=new BrowserWindow({show:false,width:540,height:500,minWidth:380,minHeight:380,autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'host-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});home.on('closed',()=>{home=null;});
  ipcMain.handle('receiver:connect',async(event,address)=>{
   if(event.sender!==home?.webContents||event.sender.getURL()!==homeUrl)throw Error('Janela não autorizada.');
   const url=receiverUrl(address);origin=url.origin;

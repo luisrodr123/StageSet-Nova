@@ -1,5 +1,15 @@
 # Continuar o StageSet noutro PC
 
+## Versão 0.17: Hosts interativos
+
+`host.js` usa `/api/poll` autenticado com espera por atualização (até 1,5 s sem alterações), deltas de conteúdo e relógio local em `host-sync.js`. Nunca introduzir um intervalo fixo entre atualizações recebidas. `lineTimes` e `playbackRate` vêm do StageSet; a compensação só muda a apresentação local.
+
+Edição/desenho passam por `desktop/host-requests.cjs` e pelo `requestScreen` existente no renderer principal. A validação verifica token, saída e música novamente quando a gravação sai da fila; conflitos mantêm o rascunho. Nunca escrever a biblioteca diretamente no servidor HTTP.
+
+`desktop/host-access.cjs` guarda hash scrypt e hashes de credenciais de dispositivos em `host-access.json` no perfil local, fora do show/Git. A troca de palavra-passe revoga os dispositivos. `host-setlist.js` gere a lista lateral e o temporizador; tamanho, atraso e visibilidade são preferências locais dos recetores.
+
+Testes adicionais: `tests/host-interactive.test.mjs` (relógio, autorização persistente, revogação, deltas), `tests/host-interactive-ui.cjs` (IPC/IndexedDB, edição, desenho tátil, pinça real, setlist e reconexão). Os testes móveis usam apenas o servidor de loopback `tests/mobile-server.cjs`, nunca o show do utilizador.
+
 ## Obter e executar
 
 Instalar Git e Node.js 24 (mínimo suportado: 22.12). No terminal:

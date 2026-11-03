@@ -21,6 +21,11 @@ import static org.junit.Assert.*;
         if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){T found=find(group.getChildAt(i),kind);if(found!=null)return found;}}
         return null;
     }
+    private Button button(View view,String text){
+        if(view instanceof Button&&text.contentEquals(((Button)view).getText()))return (Button)view;
+        if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){Button found=button(group.getChildAt(i),text);if(found!=null)return found;}}
+        return null;
+    }
     private String js(WebView web,String script) throws Exception {
         AtomicReference<String> result=new AtomicReference<>();CountDownLatch done=new CountDownLatch(1);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->web.evaluateJavascript(script,value->{result.set(value);done.countDown();}));
@@ -30,12 +35,22 @@ import static org.junit.Assert.*;
     @Test public void receivesLyricsAndReturnsHome() throws Exception {
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
             AtomicReference<WebView> receiver=new AtomicReference<>();
-            scenario.onActivity(activity->{View root=activity.getWindow().getDecorView();find(root,EditText.class).setText("http://127.0.0.1:4186");find(root,Button.class).performClick();receiver.set(find(root,WebView.class));});
+            scenario.onActivity(activity->{View root=activity.getWindow().getDecorView();find(root,EditText.class).setText("http://127.0.0.1:4186");button(root,"Ligar ao StageSet").performClick();receiver.set(find(root,WebView.class));});
             WebView web=receiver.get();assertNotNull(web);
             waitJS(web,"!!document.getElementById('join')?.onsubmit");
             js(web,"document.getElementById('name').value='Android tablet test';document.getElementById('code').value='stageset-test';document.getElementById('join').requestSubmit()");
             waitJS(web,"document.querySelector('.current')?.textContent==='StageSet mobile test'");
             assertEquals("true",js(web,"typeof stageSetReceiver==='undefined'&&typeof require==='undefined'"));
+            waitJS(web,"!document.querySelector('[data-screen=edit]').disabled&&!document.querySelector('[data-screen=paint]').disabled");
+            assertEquals("true",js(web,"document.querySelectorAll('.host-setlist li').length===2"));
+            js(web,"document.querySelector('[data-screen=larger]').click()");
+            waitJS(web,"document.querySelector('[data-screen=font]').value==='42'");
+            js(web,"document.querySelector('[data-screen=edit]').click()");
+            waitJS(web,"!document.querySelector('.screen-editor').hidden");
+            js(web,"document.querySelector('.screen-editor textarea').value+='\\nAndroid edit';document.querySelector('[data-screen=save]').click()");
+            waitJS(web,"document.querySelector('.screen-editor').hidden&&document.getElementById('lines').textContent.includes('Android edit')");
+            js(web,"document.querySelector('[data-screen=paint]').click()");
+            waitJS(web,"document.getElementById('stage').dataset.paint==='true'");
             scenario.onActivity(activity->{activity.onBackPressed();assertNotNull(find(activity.getWindow().getDecorView(),EditText.class));});
         }
     }

@@ -20,13 +20,14 @@ export function screenClient(output) {
   });
 }
 
-export function createLyricsScreen({host, viewport, request, extraControls}) {
+export function createLyricsScreen({host, viewport, request, extraControls, fontControl}) {
   host.classList.add('screen-host'); viewport.classList.add('screen-viewport');
   const toolbar = document.createElement('div'); toolbar.className = 'screen-toolbar';
   toolbar.innerHTML = `<button type="button" data-screen="menu" aria-label="Funções deste ecrã" aria-expanded="false">☰ Ecrã</button>
     <div class="screen-panel" hidden>
       <div class="screen-row"><button type="button" data-screen="back" title="Consultar linhas anteriores, sem deslocar o áudio">↑ Anterior</button><button type="button" data-screen="forward" title="Consultar linhas seguintes, sem deslocar o áudio">↓ Seguinte</button><button type="button" data-screen="focus">Voltar ao foco</button></div>
       <div class="screen-row"><button type="button" data-screen="fullscreen">⛶ Ecrã inteiro</button><button type="button" data-screen="edit">Editar letras</button><button type="button" data-screen="paint" aria-pressed="false">✎ Desenhar</button></div>
+      ${fontControl?'<div class="screen-row"><button type="button" data-screen="smaller" aria-label="Diminuir letra">A−</button><label>Letra <input type="range" data-screen="font" min="14" max="120" step="1"><output data-screen="font-value"></output></label><button type="button" data-screen="larger" aria-label="Aumentar letra">A+</button><button type="button" data-screen="font-reset">Tamanho do StageSet</button><small>Dois dedos ajustam a letra, também no modo Desenhar.</small></div>':''}
       <div class="screen-row screen-brushes" hidden><label>Cor <input type="color" data-screen="color" value="#ffdb4d"></label><label>Traço <input type="range" data-screen="width" min="2" max="30" value="5"></label><button type="button" data-screen="eraser" aria-pressed="false">Borracha</button><button type="button" data-screen="undo">Anular</button><button type="button" data-screen="clear">Limpar</button></div>
       <div class="screen-row"><button type="button" data-screen="pdf">Exportar PDF</button><button type="button" data-screen="anchor">Fixar notas antigas às linhas visíveis</button></div>
       <div class="screen-extra screen-row"></div>
@@ -43,7 +44,7 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
   let context = {}, prefs = screenPreferences(), prefsDirty=false, manualUntil = 0, manualTop = 0, lastFocus = null, idleTimer, focusTimer;
   let paint = false, eraser = false, strokes = [], revision = 0, stroke = null, loadingNotes = false, saving = false, dirty = false, draft = null, editingBusy = false, generation = 0;
   const unsaved = new Map();
-  const key = () => context.songId || '';
+  const key = () => context.songId ? (context.output||'main')+':'+context.songId : '';
   const message = text => {status.textContent = text;};
   function wake() {
     toolbar.dataset.idle = 'false'; clearTimeout(idleTimer);
@@ -77,13 +78,36 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
   el('back').onclick=()=>move(-Math.max(36,currentLine()?.getBoundingClientRect().height||48));
   el('forward').onclick=()=>move(Math.max(36,currentLine()?.getBoundingClientRect().height||48));
   host.addEventListener('wheel',event=>{
-    if (event.target.closest('.screen-toolbar,.screen-editor') || !viewport.getClientRects().length) return;
+    if (event.target.closest('.screen-toolbar,.screen-editor,.host-setlist,.host-setlist-toggle') || !viewport.getClientRects().length) return;
     event.preventDefault();move(event.deltaY*(event.deltaMode===1?28:event.deltaMode===2?viewport.clientHeight:1));
   },{passive:false});
   let drag = null;
   viewport.addEventListener('pointerdown',event=>{if(event.button!==0||paint||event.target.closest('a,input,button,textarea,iframe'))return;drag={id:event.pointerId,y:event.clientY};viewport.setPointerCapture(event.pointerId);});
   viewport.addEventListener('pointermove',event=>{if(!drag||drag.id!==event.pointerId)return;const delta=drag.y-event.clientY;drag.y=event.clientY;if(delta)move(delta);});
   const endDrag=()=>{drag=null;};viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',endDrag);
+  function showFont(){if(!fontControl)return;const size=fontControl.get();el('font').value=size;el('font-value').textContent=Math.round(size)+' px';}
+  function changeFont(size){fontControl.set(Math.round(Math.max(14,Math.min(120,size))));showFont();resize();wake();}
+  if(fontControl){
+    viewport.style.touchAction='none';
+    el('font').oninput=()=>changeFont(Number(el('font').value));
+    el('smaller').onclick=()=>changeFont(fontControl.get()-2);el('larger').onclick=()=>changeFont(fontControl.get()+2);
+    el('font-reset').onclick=()=>{fontControl.set(null);showFont();resize();};
+    const fingers=new Map();let pinch=null,suppress=false;
+    const distance=()=>{const [a,b]=[...fingers.values()];return Math.hypot(a.x-b.x,a.y-b.y);};
+    host.addEventListener('pointerdown',event=>{
+      if(event.pointerType!=='touch'||event.target.closest('.screen-toolbar,.screen-editor,.host-setlist,.host-setlist-toggle'))return;
+      fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+      if(fingers.size===2){pinch={distance:Math.max(1,distance()),size:fontControl.get()};suppress=true;drag=null;stroke=null;redraw();}
+      if(suppress){event.preventDefault();event.stopPropagation();host.setPointerCapture(event.pointerId);}
+    },true);
+    host.addEventListener('pointermove',event=>{
+      if(!fingers.has(event.pointerId))return;fingers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+      if(!suppress)return;event.preventDefault();event.stopPropagation();
+      if(fingers.size===2&&pinch)changeFont(pinch.size*distance()/pinch.distance);
+    },true);
+    const endPinch=event=>{if(!fingers.has(event.pointerId))return;fingers.delete(event.pointerId);if(suppress){event.preventDefault();event.stopPropagation();}if(!fingers.size){suppress=false;pinch=null;drag=null;}};
+    host.addEventListener('pointerup',endPinch,true);host.addEventListener('pointercancel',endPinch,true);
+  }
   async function fullscreen() {
     try {if(document.fullscreenElement===host)await document.exitFullscreen();else if(host.requestFullscreen)await host.requestFullscreen({navigationUI:'hide'});else throw Error('Ecrã inteiro indisponível neste browser.');}catch(error){message(error.message);}
   }
@@ -104,19 +128,19 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
     if(manualUntil>performance.now())viewport.scrollTop=manualTop;else centerFocus();
   }
   let resizeFrame;
-  const observer=new ResizeObserver(()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});observer.observe(host);
+  const observer=new ResizeObserver(()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});observer.observe(host);observer.observe(viewport);
   function drawingButtons() {for(const name of ['undo','clear'])el(name).disabled=!!context.readOnly||!strokes.length||loadingNotes||saving;el('paint').disabled=!!context.readOnly||!key()||loadingNotes;el('anchor').disabled=!!context.readOnly;el('retry').hidden=!dirty||saving;}
   function setPaint(value) {paint=value;host.dataset.paint=String(value);el('paint').setAttribute('aria-pressed',String(value));toolbar.querySelector('.screen-brushes').hidden=!value;wake();}
   el('paint').onclick=()=>setPaint(!paint);
   el('eraser').onclick=()=>{eraser=!eraser;el('eraser').setAttribute('aria-pressed',String(eraser));};
   async function saveDrawing() {
     if(!key()||saving||!dirty)return;
-    const songId=key(),thisGeneration=generation,data=strokes,savedRevision=revision; saving=true;drawingButtons();message('A guardar desenho…');
+    const songId=context.songId,scope=key(),thisGeneration=generation,data=strokes,savedRevision=revision; saving=true;drawingButtons();message('A guardar desenho…');
     try {
       const result=await request('drawing-save',{songId,revision:savedRevision,strokes:validateDrawing(data)});
-      unsaved.delete(songId);
+      unsaved.delete(scope);
       if(thisGeneration===generation){revision=result.revision;dirty=false;message('Desenho guardado nesta música e saída.');}
-    } catch(error) {unsaved.set(songId,{strokes:data,revision:savedRevision});if(thisGeneration===generation)message(error.message);}
+    } catch(error) {unsaved.set(scope,{strokes:data,revision:savedRevision});if(thisGeneration===generation)message(error.message);}
     finally {if(thisGeneration===generation){saving=false;drawingButtons();}}
   }
   function changedDrawing() {dirty=true;unsaved.set(key(),{strokes,revision});redraw();void saveDrawing();}
@@ -134,8 +158,8 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
   function finishStroke(){if(!stroke)return;strokes=[...strokes,stroke];stroke=null;changedDrawing();}
   canvas.addEventListener('pointerup',finishStroke);canvas.addEventListener('pointercancel',finishStroke);
   async function loadDrawing() {
-    const songId=key(),thisGeneration=generation;if(!songId)return;
-    const cached=unsaved.get(songId);if(cached){strokes=cached.strokes;revision=cached.revision;dirty=true;drawingButtons();redraw();return;}
+    const songId=context.songId,thisGeneration=generation;if(!songId)return;
+    const cached=unsaved.get(key());if(cached){strokes=cached.strokes;revision=cached.revision;dirty=true;drawingButtons();redraw();return;}
     loadingNotes=true;drawingButtons();
     try {const data=await request('drawing-read',{songId});if(thisGeneration===generation&&!dirty){strokes=validateDrawing(data.strokes);revision=data.revision;redraw();}}
     catch(error){if(thisGeneration===generation)message(error.message);}
@@ -144,7 +168,7 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
   el('edit').onclick=async()=>{
     if(editingBusy)return;editingBusy=true;
     try {
-      const data=await request('lyrics-read',{songId:key()});draft=data;
+      const data=await request('lyrics-read',{songId:context.songId});draft={...data,output:context.output};
       editor.querySelector('strong').textContent=data.title+' · '+data.outputName;
       editor.querySelector('textarea').value=data.text;editor.querySelector('.screen-edit-status').textContent='';editor.hidden=false;setPaint(false);wake();editor.querySelector('textarea').focus();
     }catch(error){message(error.message);}finally{editingBusy=false;}
@@ -152,18 +176,19 @@ export function createLyricsScreen({host, viewport, request, extraControls}) {
   editor.querySelector('[data-screen=cancel]').onclick=()=>{if(editingBusy)return;editor.hidden=true;draft=null;wake();};
   editor.querySelector('[data-screen=save]').onclick=async()=>{
     if(!draft||editingBusy)return;editingBusy=true;const save=editor.querySelector('[data-screen=save]');save.disabled=true;
-    try {await request('lyrics-save',{songId:draft.songId,baseText:draft.text,text:editor.querySelector('textarea').value});editor.hidden=true;draft=null;message('Letras guardadas nesta saída.');wake();}
+    try {if(context.remote&&(draft.songId!==context.songId||draft.output!==context.output))throw Error('A música ou a saída mudou. Copia o teu rascunho antes de reabrir as letras.');await request('lyrics-save',{songId:draft.songId,baseText:draft.text,text:editor.querySelector('textarea').value});editor.hidden=true;draft=null;message('Letras guardadas nesta saída.');wake();}
     catch(error){editor.querySelector('.screen-edit-status').textContent=error.message;}
     finally{save.disabled=false;editingBusy=false;}
   };
-  attachEventInserter(editor.querySelector('textarea'),{root:editor,context:()=>draft&&({...draft,position:context.position}),save:(ctx,event)=>request('event-save',{songId:ctx.songId,event})});
+  attachEventInserter(editor.querySelector('textarea'),{root:editor,context:()=>context.canInsertEvents===false?null:draft&&({...draft,position:context.position}),save:(ctx,event)=>request('event-save',{songId:ctx.songId,event})});
   function update(data) {
-    const changed=context.songId!==data.songId;context=data;
+    const changed=context.songId!==data.songId||context.output!==data.output;context=data;showFont();
     if(changed){generation++;manualUntil=0;clearTimeout(focusTimer);lastFocus=null;stroke=null;strokes=[];revision=0;dirty=false;saving=false;loadingNotes=false;setPaint(false);redraw();void loadDrawing();}
     else if(key()&&!dirty&&!saving&&!loadingNotes&&Number(data.annotationVersion||0)!==revision)void loadDrawing();
     const nextPrefs=screenPreferences(data.overlay);if(!prefsDirty&&JSON.stringify(nextPrefs)!==JSON.stringify(prefs))setPrefs(nextPrefs);
     el('edit').disabled=!key()||!data.canEdit;el('edit').title=data.canEdit?'Editar apenas as letras desta saída':'Entra no Studio no computador principal para editar';drawingButtons();
-    if(data.readOnly){el('paint').disabled=true;el('anchor').disabled=true;}
+    if(data.remote)el('edit').textContent=data.canEdit?'Editar letras':'Editar · requer Studio';
+    if(data.readOnly){el('paint').disabled=true;el('anchor').disabled=true;if(paint)setPaint(false);}
     const line=currentLine(),focusId=line?.dataset.sourceIndex||[...viewport.children].indexOf(line);
     if(manualUntil>performance.now())viewport.scrollTop=manualTop;
     else if(line!==lastFocus||focusId!==host.dataset.focus){centerFocus();host.dataset.focus=String(focusId);lastFocus=line;host.dataset.manual='false';}

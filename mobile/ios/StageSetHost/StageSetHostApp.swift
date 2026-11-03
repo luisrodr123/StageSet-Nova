@@ -8,6 +8,8 @@ import WebKit
 struct SharedPDF: Identifiable { let id = UUID(); let url: URL }
 struct HostView: View {
     @AppStorage("serverAddress") private var address = ""
+    @AppStorage("autoConnect") private var autoConnect = true
+    @State private var attemptedAutoConnect = false
     @State private var server: URL?
     @State private var error = ""
     @State private var pdf: SharedPDF?
@@ -25,6 +27,7 @@ struct HostView: View {
                         Text("Recetor de letras · iPhone e iPad")
                         Text("Endereço mostrado no StageSet")
                         TextField("http://192.168.1.20:4180", text: $address).textFieldStyle(.roundedBorder).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("server-address")
+                        Toggle("Ligar automaticamente ao abrir", isOn: $autoConnect)
                         Button("Ligar ao StageSet", action: connect).buttonStyle(.borderedProminent).tint(.mint)
                         Text(error).foregroundStyle(.orange).accessibilityLabel(error)
                         Text("Usa a mesma rede do computador principal e permite o acesso à rede local. Depois de ligar, indica o nome deste dispositivo e o código da sessão. No StageSet principal, atribui a saída de letras.")
@@ -33,6 +36,7 @@ struct HostView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { if !attemptedAutoConnect { attemptedAutoConnect = true; if autoConnect && !address.isEmpty { connect() } } }
         .statusBarHidden(server != nil)
         .onChange(of: server) { value in UIApplication.shared.isIdleTimerDisabled = value != nil }
         .sheet(item: $pdf) { item in SharePDF(url: item.url) }

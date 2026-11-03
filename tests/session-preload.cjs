@@ -3,6 +3,9 @@ const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('stageSetDesktop',{
   showInfo:()=>ipcRenderer.invoke('test-show-info'),showCreate:(name,previous)=>ipcRenderer.invoke('test-show-create',name,previous),showSave:s=>ipcRenderer.invoke('test-show-save',s),showOpen:()=>ipcRenderer.invoke('test-show-open'),showZip:()=>ipcRenderer.invoke('test-show-zip'),showDetach:()=>ipcRenderer.invoke('test-show-detach'),
   hostStart:config=>ipcRenderer.invoke('test-host-start',config),hostStop:()=>ipcRenderer.invoke('test-host-stop'),hostClients:()=>ipcRenderer.invoke('test-host-clients'),hostAssign:(id,output)=>ipcRenderer.invoke('test-host-assign',id,output),hostPublish:(id,frame)=>ipcRenderer.invoke('test-host-publish',id,frame),
+  hostValidate:id=>ipcRenderer.invoke('test-host:validate',id),
+  hostAuthInfo:()=>ipcRenderer.invoke('test-host-authInfo'),hostAuthPassword:value=>ipcRenderer.invoke('test-host-authPassword',value),hostAuthForget:()=>ipcRenderer.invoke('test-host-authForget'),
+  onHostRequest:callback=>ipcRenderer.on('test-host:request',async(_,request)=>{let response;try{response={result:await callback(request)};}catch(error){response={error:error.message};}await ipcRenderer.invoke('test-host:response',{id:request.id,...response});}),
   dmxStart:config=>ipcRenderer.invoke('test-dmx-start',config),dmxStop:()=>Promise.resolve(),dmxCue:event=>ipcRenderer.invoke('test-dmx-cue',event),dmxBlackout:()=>Promise.resolve(),
   onIpMidiMessage:()=>{},onIpMidiStatus:()=>{},
   sessionInfo:()=>ipcRenderer.invoke('test-session-info'),

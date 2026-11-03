@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private TextView status;
     private EditText address;
+    private CheckBox reconnect;
     private String origin;
     private byte[] pendingPdf;
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
@@ -34,6 +35,7 @@ public class MainActivity extends Activity {
         setContentView(root);
         if(BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true);
         showHome();
+        if(getPreferences(0).getBoolean("reconnect",true)&&!address.getText().toString().isEmpty())root.post(()->connect(address.getText().toString()));
     }
     private void showHome() {
         if(web!=null){web.destroy();web=null;}
@@ -45,6 +47,7 @@ public class MainActivity extends Activity {
         TextView title=new TextView(this);title.setText("StageSet Host");title.setTextColor(Color.rgb(101,226,193));title.setTextSize(28);form.addView(title);
         TextView intro=new TextView(this);intro.setText("Recetor de letras · telemóvel e tablet\nEndereço apresentado no StageSet:");intro.setTextSize(16);form.addView(intro);
         address=new EditText(this);address.setSingleLine();address.setInputType(17);address.setHint("http://192.168.1.20:4180");address.setText(getPreferences(0).getString("address",""));address.setContentDescription("Endereço do StageSet");form.addView(address);
+        reconnect=new CheckBox(this);reconnect.setText("Ligar automaticamente ao abrir");reconnect.setChecked(getPreferences(0).getBoolean("reconnect",true));reconnect.setOnCheckedChangeListener((button,checked)->getPreferences(0).edit().putBoolean("reconnect",checked).apply());form.addView(reconnect);
         Button connect=new Button(this);connect.setText("Ligar ao StageSet");connect.setOnClickListener(v->connect(address.getText().toString()));form.addView(connect);
         status=new TextView(this);status.setTextSize(16);form.addView(status);
         TextView help=new TextView(this);help.setText("Usa a mesma rede do computador principal. Depois de ligar, indica o nome deste dispositivo e o código da sessão. No StageSet, atribui a saída de letras. O botão Casa permite mudar de servidor.");form.addView(help);
