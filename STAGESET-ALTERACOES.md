@@ -15,6 +15,16 @@ Validação: `npm run check`, 29 testes unitários/rede e suite Electron complet
 
 Verificação de distribuição: APK 0.17.0 (17000), Android mínimo 8/API 26, assinatura v2 verificada. Host portátil EXE testado com janela Windows visível, ligação HTTP real, receção de letras, isolamento e encerramento com código zero. Revogar uma autorização limpa imediatamente a apresentação no Host e exige nova entrada.
 
+A suite Electron também passou dentro do `app.asar` distribuído (código funcional `37dd31a`). No GitHub, a mesma revisão passou os testes Android (ligação, letras, edição, tamanho e setlist no emulador) e iPad (compilação, ligação e receção no simulador): https://github.com/luisrodr123/StageSet-Nova/actions/runs/41597293948. O desenho e a pinça foram exercitados com entrada tátil real no Chromium dos testes; estes resultados não substituem o ensaio físico no tablet.
+
+Pacotes gerados; somas também em `SHA256SUMS.txt`:
+
+- `StageSet-0.17.0-Portable-x64.exe` — `00ad3598dee367457d0ded7210c2f0bc182002876efe85aa4179a83a136ed35c`.
+- `StageSet-0.17.0-Setup-x64.exe` — `c41fb3017fec7371f106f0de804464b2dacd24f3f03f088ff13d8f95715ad2cc`.
+- `StageSet-Host-0.17.0-Portable-x64.exe` — `9a112b5b7a20c4e8e448284e85db5227b7d4c26599f8e9fe9b7e9bd5d1f8e5da`.
+- `StageSet-Host-0.17.0-Android-Test.apk` — `03b383aca1e9e22eef0857f8094fe98ee919a9456c5d422f5039d1f34e48d27c`.
+- `StageSet-Host-0.17.0-iOS-Project.zip` — `5b3b2063fe819193cfb24c6975a53851ac0aa3ddec43d46095d90b00f4cd715a`.
+
 Limites: a compensação reduz a espera introduzida pela aplicação, mas não elimina a latência física nem mede a latência do áudio. Ensaio em tablets físicos e na rede Wi-Fi do espetáculo ainda necessário. Edição exige Studio no principal; consulta da setlist não controla reprodução. No iPad mantém-se a versão web; o projeto nativo necessita de compilação/assinatura Apple. A reconexão automática usa o mesmo endereço/origem e requer o servidor ativo.
 
 
