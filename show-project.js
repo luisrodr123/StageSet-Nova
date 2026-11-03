@@ -1,8 +1,8 @@
 import {createZip} from './zip-store.js';
 export const showSafeName=name=>String(name||'ficheiro').replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/[. ]+$/,'').slice(0,100)||'ficheiro';
 export async function showFiles(songs){
- const files=[],add=async(path,blob)=>{if(blob instanceof Blob)files.push({path,bytes:await blob.arrayBuffer()});};
- for(const song of songs){const dir='media/'+showSafeName(song.id)+'/';await add(dir+'audio-'+showSafeName(song.fileName),song.audioBlob);await add(dir+'midi-'+showSafeName(song.midiFileName||'faixa.mid'),song.midiBlob);await add(dir+'cdg-'+showSafeName(song.cdgFileName||'faixa.cdg'),song.cdgBlob);
+ const files=[],add=async(path,blob)=>{if(blob instanceof Blob)files.push({path,bytes:await blob.arrayBuffer()});},used=new Map();
+ for(const song of songs){const base=showSafeName(song.title||song.fileName||'Tema'),count=(used.get(base)||0)+1;used.set(base,count);const folder=count>1?`${base}-${count}`:base,dir='media/'+folder+'/';await add(dir+'audio-'+showSafeName(song.fileName),song.audioBlob);await add(dir+'midi-'+showSafeName(song.midiFileName||'faixa.mid'),song.midiBlob);await add(dir+'cdg-'+showSafeName(song.cdgFileName||'faixa.cdg'),song.cdgBlob);
   for(const [i,stem] of (song.audioStems||[]).entries())await add(dir+'stem-'+i+'-'+showSafeName(stem.fileName||stem.name||'audio.wav'),stem.blob);
   for(const [output,text] of Object.entries({main:song.lyricsText||'',...song.lyricOutputLyrics}))await add(dir+'letras-'+showSafeName(output)+'.txt',new Blob([text],{type:'text/plain'}));
   for(const event of song.lyricEvents||[])if(event.data)await add(dir+'evento-'+showSafeName(event.id)+'-'+showSafeName(event.name),await(await fetch(event.data)).blob());

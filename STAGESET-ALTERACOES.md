@@ -1,10 +1,17 @@
 # StageSet — alterações anotadas
 
+## Versão 0.20.0 — em desenvolvimento
+
+- Auditoria das anotações: o botão Hosts passa a abrir diretamente e a deslocar a janela para a lista de recetores ligados/visíveis.
+- As pastas `media` dos shows passam a usar o título seguro de cada tema; títulos repetidos recebem apenas um sufixo numérico para evitar colisões.
+
+
 ## Versão 0.19.0 — em desenvolvimento
 
 - Restaurado o ícone StageSet nos instaladores Windows e no Host portátil.
 - Duplo clique no título de uma música da setlist do Master seleciona e inicia imediatamente a música.
 - No modo Live, o menu permite agora Abrir setlist e Abrir show; as opções de gravação continuam protegidas pelo Studio.
+- As subpastas `media` dos shows usam agora o nome seguro do tema (com sufixo numérico apenas quando existem títulos repetidos), em vez do identificador interno.
 
 
 ## Versão 0.18.0 — em desenvolvimento

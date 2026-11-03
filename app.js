@@ -4278,7 +4278,7 @@ $("#settings-button").addEventListener("click", () => {
   $("#settings-modal").hidden = false;
 });
 $("#close-settings").addEventListener("click", () => { $("#settings-modal").hidden = true; });
-$("#hosts-button")?.addEventListener("click", () => { $("#settings-button").click(); toast("Hosts visíveis e autorizados: consulta a secção Rede/Hosts nas Configurações."); });
+$("#hosts-button")?.addEventListener("click", () => { $("#settings-button").click(); setTimeout(() => $("#host-settings-group")?.scrollIntoView({block:'start'}), 0); });
 $("#settings-modal").addEventListener("click", (event) => { if (event.target === event.currentTarget) event.currentTarget.hidden = true; });
 $("#settings-lyric-highlight").addEventListener("input", (event) => setLyricHighlightColor(event.target.value));
 $("#stem-provider").addEventListener("change", (event) => {
