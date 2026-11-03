@@ -110,6 +110,7 @@ let stemDeckJobId = null;
 let stemDeckCancelRequested = false;
 let timelineDrag = null;
 let timelinePointerDragged = false;
+let timelineSelection = null;
 
 function isMidiSong(song) {
   return Boolean(song && /\.(mid|midi|kar)$/i.test(song.fileName));
@@ -2895,6 +2896,7 @@ function drawTimelineEditor() {
   ctx.font = "11px sans-serif";
   lines.forEach((line) => { const x = xAt(line.time || 0); ctx.strokeStyle = "#f0b36c"; ctx.beginPath(); ctx.moveTo(x, lyricY + 3); ctx.lineTo(x, h - 12); ctx.stroke(); ctx.fillStyle = "#e4c28e"; ctx.fillText(String(line.text || "").slice(0, 48), x + 3, lyricY + 18); });
   const playX = xAt(currentPosition()); ctx.strokeStyle = "#ff7b7b"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(playX, 0); ctx.lineTo(playX, h); ctx.stroke();
+  if (timelineSelection) { const a=xAt(timelineSelection.start),b=xAt(timelineSelection.end);ctx.fillStyle='#65e2c126';ctx.fillRect(Math.min(a,b),0,Math.abs(b-a),h);ctx.strokeStyle='#65e2c1';ctx.lineWidth=1;ctx.strokeRect(Math.min(a,b),1,Math.max(1,Math.abs(b-a)),h-2); }
   $("#timeline-position").textContent = formatTime(currentPosition());
   $("#timeline-zoom-label").textContent = `${Math.round(state.timelineZoom * 100)}%`;
 }
@@ -2927,6 +2929,7 @@ function timelineTimeAt(x) {
 }
 
 function beginTimelinePointerEdit(event) {
+  if ($("#timeline-select")?.classList.contains('active')) { const canvas=$("#timeline-canvas"); if (event.button!==0||!selectedSong()) return; const {x}=timelineCoordinate(event);timelineSelection={start:timelineTimeAt(x),end:timelineTimeAt(x)};canvas.setPointerCapture(event.pointerId);drawTimelineEditor();return; }
   const song = selectedSong(); if (!song || event.button !== 0) return;
   const { x, y } = timelineCoordinate(event), duration = Math.max(1, currentDuration(), midiData?.duration ?? 0), xAt = (time) => 92 + Math.max(0, Math.min(duration, time)) / duration * ($("#timeline-canvas").width - 108);
   if (y >= 332 && y < 435) {
@@ -2941,6 +2944,7 @@ function beginTimelinePointerEdit(event) {
 }
 
 async function moveTimelinePointerEdit(event) {
+  if (timelineSelection && $("#timeline-select")?.classList.contains('active')) { const {x}=timelineCoordinate(event);timelineSelection.end=timelineTimeAt(x);drawTimelineEditor();return; }
   if (!timelineDrag) return;
   const songIndex = state.songs.findIndex((song) => song.id === timelineDrag.id), song = state.songs[songIndex];
   if (!song) return;
@@ -2973,6 +2977,7 @@ async function moveTimelinePointerEdit(event) {
 }
 
 async function finishTimelinePointerEdit() {
+  if (timelineSelection && $("#timeline-select")?.classList.contains('active')) { const a=Math.min(timelineSelection.start,timelineSelection.end),b=Math.max(timelineSelection.start,timelineSelection.end);timelineSelection={start:a,end:b};drawTimelineEditor();return; }
   const drag = timelineDrag; timelineDrag = null;
   if (!drag?.moved) return;
   const song = state.songs.find((item) => item.id === drag.id);
@@ -4420,8 +4425,8 @@ $("#timeline-forward").addEventListener("click", () => { const target = Math.min
 $("#timeline-rewind")?.addEventListener("click", () => { if (isMidiSong(selectedSong())) midiPlayer.seek(0); else audio.currentTime = 0; drawTimelineEditor(); });
 $("#timeline-ffw")?.addEventListener("click", () => { const target=Math.min(currentDuration(),currentPosition()+30); if (isMidiSong(selectedSong())) midiPlayer.seek(target); else audio.currentTime=target; drawTimelineEditor(); });
 $("#timeline-select")?.addEventListener("click", event => { event.currentTarget.classList.toggle('active'); toast('Modo de seleção multipista ativo.'); });
-$("#timeline-trim")?.addEventListener("click", () => { const song=selectedSong(); if(song){const updated={...song,timelineTrim:{start:0,end:currentPosition()}}; void dbPut(updated); state.songs[state.songs.findIndex(item=>item.id===song.id)]=updated; toast('Trim guardado como edição não destrutiva.');} });
-$("#timeline-cut")?.addEventListener("click", () => { const song=selectedSong(); if(song){const updated={...song,timelineCutAt:currentPosition()}; void dbPut(updated); state.songs[state.songs.findIndex(item=>item.id===song.id)]=updated; toast('Cut marcado na posição atual da faixa.');} });
+$("#timeline-trim")?.addEventListener("click", () => { const song=selectedSong(); if(song&&timelineSelection){const updated={...song,timelineTrim:{...timelineSelection}}; void dbPut(updated); state.songs[state.songs.findIndex(item=>item.id===song.id)]=updated; toast(`Trim selecionado: ${formatTime(timelineSelection.start)}–${formatTime(timelineSelection.end)}.`);} else toast('Ativa Selecionar e arrasta uma região na faixa.'); });
+$("#timeline-cut")?.addEventListener("click", async () => { const song=selectedSong(); if(!song||!timelineSelection)return toast('Ativa Selecionar e arrasta uma região na faixa.'); const {start,end}=timelineSelection,updated={...song,timelineControllers:(song.timelineControllers||[]).filter(item=>item.time<start||item.time>end),lyricLines:(song.lyricLines||[]).filter(line=>(line.time||0)<start||(line.time||0)>end),timelineCut:{start,end}}; await dbPut(updated);state.songs[state.songs.findIndex(item=>item.id===song.id)]=updated;drawTimelineEditor();renderLyrics();toast(`Cut aplicado à região ${formatTime(start)}–${formatTime(end)}.`); });
 $("#timeline-convert-midi").addEventListener("click", exportTimelineMidi);
 document.addEventListener('dblclick', event => { const input=event.target.closest('input[type="range"]'); if(!input)return; const value=prompt('Introduzir valor',input.value); if(value===null)return; input.value=value; input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true})); });
 $("#timeline-save-lyrics").addEventListener("click", () => { $("#timeline-editor-modal").hidden = true; openLyricsEditor(); });

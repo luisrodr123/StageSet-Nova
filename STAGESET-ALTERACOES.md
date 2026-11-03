@@ -4,6 +4,7 @@
 
 - Auditoria das anotações: o botão Hosts passa a abrir diretamente e a deslocar a janela para a lista de recetores ligados/visíveis.
 - As pastas `media` dos shows passam a usar o título seguro de cada tema; títulos repetidos recebem apenas um sufixo numérico para evitar colisões.
+- O editor multipista passa a permitir selecionar uma região arrastando no gráfico; Trim guarda a região e Cut remove os eventos MIDI/letras dessa região de forma não destrutiva.
 
 
 ## Versão 0.19.0 — em desenvolvimento
