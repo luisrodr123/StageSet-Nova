@@ -4925,7 +4925,7 @@ mainLyricsScreen=createLyricsScreen({host:$('#lyrics-stage'),viewport:$('#lyrics
 hostPublisher=setupHostSettings({container:$('.settings-modal'),outputs:()=>state.displayOutputs.map(o=>({id:o.id,name:o.name})),refresh:refreshMosaic});
 window.stageSetDesktop?.onHostRequest?.(({id,action,output,data})=>requestScreen(action,output,data,()=>window.stageSetDesktop.hostValidate(id)));
 attachEventInserter($('#lyrics-editor-text'),{root:$('.lyrics-editor-modal'),context:()=>({songId:editingLyricsSongId,output:editingLyricsOutput,position:currentPosition()}),save:(ctx,event)=>requestScreen('event-save',ctx.output,{songId:ctx.songId,event})});
-showProject=setupShowProject({snapshot:async()=>({backup:currentShowBackup(),files:await showFiles(state.songs)}),clear:clearLibraryContents,restore:restoreBackupFile,allow:requireStudio,notify:toast});
+showProject=setupShowProject({snapshot:async()=>({backup:currentShowBackup(),files:await showFiles(state.songs)}),clear:clearLibraryContents,restore:restoreBackupFile,allow:requireStudio,allowOpen:()=>true,notify:toast});
 initialize().then(()=>showProject.ready()).catch(e=>toast(e.message));
 let savedShowPreferences='';setInterval(()=>{if(!showProject?.active)return;const preferences=JSON.stringify([...transferSettingKeys.map(key=>localStorage.getItem(key)),state.volume,state.autoScroll,state.quickies,state.pedalMappings,state.hideSetlistDuringPlayback,state.interSongDelay,[...state.playedSongIds]]);if(preferences!==savedShowPreferences){savedShowPreferences=preferences;showProject.changed();}},1500);
 
