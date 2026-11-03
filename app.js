@@ -1914,7 +1914,6 @@ function exportSetlistFile() {
 }
 
 async function importSetlistFile(file) {
-  if (!requireStudio()) return;
   try {
     if (file.size > 5 * 1024 * 1024) throw new Error("O ficheiro de setlist excede 5 MB.");
     const data = JSON.parse(await file.text());
@@ -4045,7 +4044,6 @@ function exportBackup() {
 }
 
 async function restoreBackupFile(file,options={}) {
-  if (!requireStudio()) return;
   try {
     const backup = await readBackup(file);
     const count = backup.songs.length;

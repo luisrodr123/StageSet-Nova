@@ -16,9 +16,11 @@ addEventListener('message',event=>{
     const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=true;
     const name=document.createElement('span');label.append(check,name);document.querySelector('#selectors').append(label);checks.set(d.output,{check,name});
     check.onchange=()=>{tile.hidden=!check.checked;send({type:'stageset-mosaic-setting',output:d.output,visible:check.checked});};
-    tile.querySelector('input').oninput=e=>{const value=Number(e.target.value);if(Number.isInteger(value)&&value>=16&&value<=96)send({type:'stageset-mosaic-setting',output:d.output,fontSize:value});};
+    tile.querySelector('input').oninput=e=>{const value=Number(e.target.value);if(Number.isInteger(value)&&value>=16&&value<=96){tile.dataset.manualFont='true';send({type:'stageset-mosaic-setting',output:d.output,fontSize:value});}};
     tile.querySelector('select').onchange=e=>send({type:'stageset-mosaic-setting',output:d.output,displayId:e.target.value});
     document.querySelector('#grid').append(tile);tiles.set(d.output,tile);
+    const resizeMosaicText=()=>{if(tile.dataset.manualFont==='true')return;const size=Math.max(16,Math.min(96,Math.round(Math.min(tile.clientWidth/12,tile.clientHeight/8))));tile.querySelector('.tile-lyrics').style.setProperty('--mosaic-auto-font',size+'px');tile.querySelectorAll('.line').forEach(line=>line.style.fontSize='var(--mosaic-auto-font)');};
+    new ResizeObserver(resizeMosaicText).observe(tile);resizeMosaicText();
     screens.set(d.output,createLyricsScreen({host:tile.querySelector('.lines'),viewport:tile.querySelector('.tile-lyrics'),request:screenClient(d.output),extraControls:tile.querySelector('.controls')}));
   }
   checks.get(d.output).name.textContent=' '+d.name+' ';tile.querySelector('h2').textContent=d.name;
@@ -29,6 +31,6 @@ addEventListener('message',event=>{
   if(select.dataset.options!==displayKey){select.replaceChildren(new Option('Ecrã atual',''),...(d.displays||[]).map(item=>new Option(item.name,item.id)));select.dataset.options=displayKey;}
   select.disabled=!d.desktop;if(document.activeElement!==select)select.value=d.displayId||'';
   document.querySelector('#show-timestamps').checked=!!d.timestamps;
-  renderScreenLines(tile.querySelector('.tile-lyrics'),d);screens.get(d.output).update(d);
+  renderScreenLines(tile.querySelector('.tile-lyrics'),d);if(tile.dataset.manualFont!=='true')tile.querySelectorAll('.line').forEach(line=>line.style.fontSize='var(--mosaic-auto-font)');screens.get(d.output).update(d);
 });
 send({type:'stageset-mosaic-ready'});

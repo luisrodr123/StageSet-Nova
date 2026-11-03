@@ -6,6 +6,8 @@
 - As pastas `media` dos shows passam a usar o título seguro de cada tema; títulos repetidos recebem apenas um sufixo numérico para evitar colisões.
 - O editor multipista passa a permitir selecionar uma região arrastando no gráfico; Trim guarda a região e Cut remove os eventos MIDI/letras dessa região de forma não destrutiva.
 - Importação aceita backups JSON legados (com áudio data URL) e setlists antigas sem o cabeçalho atual; os campos ausentes são preenchidos com valores seguros e as músicas são reconciliadas por ID, nome e ficheiro.
+- Corrigido o carregamento de Setlist/Show no modo Live: os botões já não aparecem ativos enquanto a função recusava a operação por exigir Studio.
+- O mosaico ajusta automaticamente o tamanho da letra ao tamanho de cada janela; um valor introduzido manualmente mantém prioridade nessa janela.
 
 
 ## Versão 0.19.0 — em desenvolvimento
