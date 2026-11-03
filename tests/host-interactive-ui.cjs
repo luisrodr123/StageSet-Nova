@@ -55,7 +55,10 @@ module.exports=async({win,host,children})=>{
     assert.equal(await js(win,`return document.getElementById('progress').value`),before);
     await new Promise(r=>setTimeout(r,250));assert.equal(await js(receiver,`return Object.values(JSON.parse(localStorage.getItem('host-fonts'))).includes(${zoom})`),true);
     await js(receiver,`document.querySelector('[data-screen=paint]').click();document.querySelector('.screen-panel').hidden=false;document.querySelector('.screen-toolbar').dataset.idle='false';document.querySelector('.host-setlist-toggle').click();`);
+    await new Promise(r=>setTimeout(r,250));
     await require('node:fs/promises').writeFile(require('node:path').resolve(__dirname,'../dist/qa/host-interactive-tablet.png'),(await receiver.webContents.capturePage()).toPNG());
+    await host.access.forget();host.revoke();
+    await wait(()=>js(receiver,`return !document.getElementById('join').hidden&&document.getElementById('stage').hidden&&!document.querySelector('#lines .line')&&!JSON.parse(localStorage.getItem('host-device'))`),'Revoked device retained authorized view');
     assert.deepEqual(errors,[]);
     console.log('0.17 receiver: native IPC -> IndexedDB lyrics and anchored touch drawing; real two-finger resize; per-song local font; latency offset without transport changes: OK');
   }finally{receiver.destroy();}

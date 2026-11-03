@@ -13,6 +13,8 @@
 
 Validação: `npm run check`, 29 testes unitários/rede e suite Electron completos aprovados. Testada gravação HTTP → IPC → IndexedDB, preservação da letra principal, desenho tátil ancorado, gesto de pinça real no Chromium, tamanho local, compensação sem alterar transporte, setlist/temporizador, palavra-passe pelo menu e reconexão após recarregar. Testes de autorização incluem reinício do servidor, recuperação da saída, revogação e ausência de palavras-passe/tokens em claro no ficheiro do servidor. APK e testes Android compilados; lint aprovado.
 
+Verificação de distribuição: APK 0.17.0 (17000), Android mínimo 8/API 26, assinatura v2 verificada. Host portátil EXE testado com janela Windows visível, ligação HTTP real, receção de letras, isolamento e encerramento com código zero. Revogar uma autorização limpa imediatamente a apresentação no Host e exige nova entrada.
+
 Limites: a compensação reduz a espera introduzida pela aplicação, mas não elimina a latência física nem mede a latência do áudio. Ensaio em tablets físicos e na rede Wi-Fi do espetáculo ainda necessário. Edição exige Studio no principal; consulta da setlist não controla reprodução. No iPad mantém-se a versão web; o projeto nativo necessita de compilação/assinatura Apple. A reconexão automática usa o mesmo endereço/origem e requer o servidor ativo.
 
 

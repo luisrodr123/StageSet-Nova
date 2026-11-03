@@ -40,7 +40,7 @@ async function receive(session){while(token===session){try{
 }catch(error){
   viewport.querySelectorAll('video').forEach(v=>v.pause());if(frame)frame={...frame,playing:false};
   status.textContent='Sem sinal · a tentar novamente. '+(error.name==='AbortError'?'':error.message);control('quality').textContent='Sem sinal';
-  if(error.status===401){token='';void wakeLock?.release();if(!await reconnect())document.getElementById('join').hidden=false;return;}
+  if(error.status===401){token='';frame=null;viewport.replaceChildren();delete viewport.dataset.lines;viewport._lyricEvents=[];screen.update({songId:'',readOnly:true});setlist.update(null);stage.hidden=true;void wakeLock?.release();if(!await reconnect())document.getElementById('join').hidden=false;return;}
   await new Promise(resolve=>setTimeout(resolve,Math.min(2000,250*++failures)));
 }}}
 function connected(result){token=result.token;mediaKey='';staticKey='';cursor='';document.getElementById('join').hidden=true;document.getElementById('code').value='';document.getElementById('error').textContent='';stage.hidden=false;status.textContent='Ligado · aguarda seleção da saída no StageSet';failures=0;void keepAwake();void ping();void receive(token);}
