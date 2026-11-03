@@ -1,5 +1,12 @@
 # StageSet — alterações anotadas
 
+## Versão 0.19.0 — em desenvolvimento
+
+- Restaurado o ícone StageSet nos instaladores Windows e no Host portátil.
+- Duplo clique no título de uma música da setlist do Master seleciona e inicia imediatamente a música.
+- No modo Live, o menu permite agora Abrir setlist e Abrir show; as opções de gravação continuam protegidas pelo Studio.
+
+
 ## Versão 0.18.0 — em desenvolvimento
 
 - Ecrã inteiro passou a oferecer Setlist e Biblioteca laterais, com títulos sempre legíveis e layout elástico.

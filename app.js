@@ -3266,6 +3266,7 @@ function renderSetlist() {
     row.querySelector(".setlist-name").textContent = song.title;
     row.querySelector(".setlist-name").title = song.title;
     row.querySelector(".setlist-name").addEventListener("click", () => selectSong(id));
+    row.querySelector(".setlist-name").addEventListener("dblclick", () => selectSong(id, true));
     const ccValue = row.querySelector(".setlist-cc-value");
     const midiMap = songMidiSelectMapping(song);
     ccValue.value = midiMap?.type === state.setlistMidiType && Number.isInteger(midiMap.value) ? String(midiMap.value) : "";
@@ -4335,7 +4336,7 @@ $("#clear-played").addEventListener("click", () => {
 });
 $("#clear-setlist").addEventListener("click", () => { if (!requireStudio()) return; if (queueDelayTimer) clearTimeout(queueDelayTimer); queueDelayTimer = null; state.setlist = []; persistSetlist(); renderLibrary(); renderSetlist(); toast("Setlist limpa."); });
 $("#setlist-save").addEventListener("click", exportSetlistFile);
-$("#setlist-load").addEventListener("click", () => requireStudio() && $("#setlist-file").click());
+$("#setlist-load").addEventListener("click", () => $("#setlist-file").click());
 $("#queue-save").addEventListener("click", exportSetlistFile);
 $("#queue-load").addEventListener("click", () => requireStudio() && $("#setlist-file").click());
 $("#setlist-file").addEventListener("change", (event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) importSetlistFile(file); });
