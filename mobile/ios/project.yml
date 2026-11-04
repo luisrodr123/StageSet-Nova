@@ -14,8 +14,8 @@ targets:
         PRODUCT_NAME: StageSet Host
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_VERSION: "5.0"
-        MARKETING_VERSION: "0.20.0"
-        CURRENT_PROJECT_VERSION: "20000"
+        MARKETING_VERSION: "0.21.0"
+        CURRENT_PROJECT_VERSION: "21000"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: StageSetHost/Info.plist
         CODE_SIGN_STYLE: Automatic

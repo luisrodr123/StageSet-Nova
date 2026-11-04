@@ -1,5 +1,11 @@
 # StageSet — alterações anotadas
 
+## Versão 0.21.0 — em desenvolvimento
+
+- Fecho da auditoria das anotações: ecrãs, Hosts, setlists, Show, mixer, mosaico, editor multipista, eventos e gravação por janela estão ligados e testados.
+- Inclui compatibilidade com Show/Setlist de versões anteriores e pastas `media` identificadas pelo nome do tema.
+
+
 ## Versão 0.20.0 — em desenvolvimento
 
 - Auditoria das anotações: o botão Hosts passa a abrir diretamente e a deslocar a janela para a lista de recetores ligados/visíveis.
