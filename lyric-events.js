@@ -13,7 +13,7 @@ export function validateEvent(e){
   }return result;
 }
 export function eventMidiBytes(e){const c=e.channel-1;return ({cc:[0xb0|c,e.number,e.value],program:[0xc0|c,e.number],noteOn:[0x90|c,e.number,e.value],noteOff:[0x80|c,e.number,e.value],pitch:[0xe0|c,e.value&127,(e.value>>7)&127],pressure:[0xd0|c,e.value],start:[0xfa],stop:[0xfc],continue:[0xfb],song:[0xf3,e.number]})[e.message];}
-export function eventMarkup(html){return html.replace(/\[stage:([a-z0-9-]{1,80})\]/gi,'<span class="lyric-event" data-event-id="$1"></span>');}
+export function eventMarkup(html){return html.replace(/(\[midi(?:@[^\]]+?)?:[^\]]*\])\s*(?=\[stage:)/gi,'<span class="lyric-event-label">$1</span>').replace(/\[stage:([a-z0-9-]{1,80})\]/gi,'<span class="lyric-event" data-event-id="$1"></span>');}
 // Untimed media inserted into timed lyrics must remain visible without converting plain lyrics to timed mode.
 export function withEventRows(raw,timed,events=[]){
   if(!timed.length)return timed;
@@ -31,7 +31,8 @@ export function hydrateEvents(viewport,events=[],position=0,playing=false){
   let cache=mediaCaches.get(viewport);if(!cache){cache=new Map();mediaCaches.set(viewport,cache);}
   for(const placeholder of viewport.querySelectorAll('[data-event-id]')){
     const e=events.find(item=>item.id===placeholder.dataset.eventId);if(!e)continue;
-    if(e.kind==='midi'||e.kind==='dmx'){placeholder.hidden=true;continue;}
+    if(e.kind==='midi'){placeholder.hidden=true;continue;}
+    if(e.kind==='dmx'){placeholder.hidden=false;placeholder.classList.add('lyric-event-label');placeholder.textContent=`[DMX ${e.channel}: ${e.value}]`;continue;}
     let node=cache.get(e.id);
     if(!node||node._mediaData!==e.data){node=document.createElement(e.kind==='picture'?'img':'video');node.src=e.data;node._mediaData=e.data;node.dataset.eventId=e.id;node.className='lyric-event-media';node.style.objectFit='contain';node.style.maxWidth='100%';if(e.kind==='video'){node.muted=true;node.playsInline=true;node.preload='auto';}else node.alt=e.name;cache.set(e.id,node);}
     node.style.width=e.width+'px';node.style.height=e.height+'px';if(placeholder!==node)placeholder.replaceWith(node);
@@ -51,14 +52,21 @@ export function attachEventInserter(textarea,{context,save,root}){
   field('kind').onchange=update;field('message').onchange=update;update();
   textarea.addEventListener('contextmenu',event=>{if(!context()?.songId)return;event.preventDefault();event.stopPropagation();selection=textarea.selectionStart;selectionEnd=textarea.selectionEnd;menu.hidden=false;menu.style.left='12px';menu.style.top='12px';});
   menu.querySelector('button').onclick=()=>{pinned=context();if(!pinned?.songId){menu.hidden=true;return;}field('time').value=(pinned.position||0).toFixed(2);menu.hidden=true;dialog.hidden=false;dialog.querySelector('[role=status]').textContent='';};
-  root.querySelector('#lyrics-insert-event')?.addEventListener('click',()=>{pinned=context();if(!pinned?.songId)return;field('time').value=(pinned.position||0).toFixed(2);dialog.hidden=false;dialog.querySelector('[role=status]').textContent='';});
-  dialog.addEventListener('keydown',e=>e.stopPropagation());dialog.querySelector('[data-action=cancel]').onclick=()=>{if(!busy)dialog.hidden=true;};
+  root.querySelector('#lyrics-insert-event')?.addEventListener('click',()=>{pinned=context();if(!pinned?.songId)return;selection=textarea.selectionStart;selectionEnd=textarea.selectionEnd;field('time').value=(pinned.position||0).toFixed(2);dialog.hidden=false;dialog.querySelector('[role=status]').textContent='';});
+  dialog.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'&&!busy){e.preventDefault();dialog.hidden=true;textarea.focus();}});dialog.querySelector('[data-action=cancel]').onclick=()=>{if(!busy)dialog.hidden=true;};
   dialog.querySelector('[data-action=insert]').onclick=async()=>{
     if(busy)return;busy=true;const button=dialog.querySelector('[data-action=insert]');button.disabled=true;
     try{
       const kind=field('kind').value,e={kind,time:Number(field('time').value),message:field('message').value,channel:Number(field(kind==='dmx'?'dmxChannel':'midiChannel').value),number:Number(field('number').value),value:Number(field(kind==='dmx'?'dmxValue':'value').value),universe:Number(field('universe').value),fade:Number(field('fade').value)};
       if(kind==='picture'||kind==='video'){const file=field('file').files[0];if(!file||file.size>8*1024*1024)throw Error('Escolhe um ficheiro até 8 MB.');e.name=file.name;e.width=Number(field('width').value);e.height=Number(field('height').value);e.data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
-      const event=validateEvent(e);await save(pinned,event);const tag='[stage:'+event.id+']';textarea.setRangeText(tag,selection,selectionEnd,'end');textarea.dispatchEvent(new Event('input',{bubbles:true}));dialog.hidden=true;textarea.focus();
+      const event=validateEvent(e);await save(pinned,event);let tag;
+      if(event.kind==='midi'){
+        const channel=event.channel, msg=event.message;
+        const command=msg==='cc'?`CC${event.number}.${event.value}@${channel}`:msg==='program'?`PC${event.number}@${channel}`:msg==='noteOn'?`ON${event.number}.${event.value}@${channel}`:msg==='noteOff'?`OFF${event.number}.0@${channel}`:msg==='pitch'?`PB${event.value}@${channel}`:msg==='pressure'?`AT${event.value}@${channel}`:msg==='song'?`SONG${event.number}`:msg==='start'?'START':msg==='stop'?'STOP':'CONTINUE';
+        const time=event.time, clock=`${String(Math.floor(time/60)).padStart(2,'0')}:${(time%60).toFixed(2).padStart(5,'0')}`;
+        tag=(msg==='start'||msg==='stop'||msg==='continue'?`[midi@${msg==='start'?'play':msg}: ${command}]`:time>0?`[midi@${clock}: ${command}]`:`[midi: ${command}]`)+`[stage:${event.id}]`;
+      }else{tag='[stage:'+event.id+']';}
+      textarea.setRangeText(tag,selection,selectionEnd,'end');textarea.dispatchEvent(new Event('input',{bubbles:true}));dialog.hidden=true;textarea.focus();
     }catch(error){dialog.querySelector('[role=status]').textContent=error.message;}finally{busy=false;button.disabled=false;}
   };
 }

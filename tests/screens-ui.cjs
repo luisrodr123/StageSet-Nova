@@ -55,7 +55,7 @@ module.exports=async({win,mosaic,evaluate,children})=>{
   // Paint actual pointer input; pen, eraser, undo and persistence are exercised through UI.
   await js(band,`document.querySelector('[data-screen=paint]').click();`);
   async function draw(){
-    const r=await js(band,`const r=document.querySelector('.screen-ink').getBoundingClientRect();return {x:Math.round(r.width*.2),y:Math.round(r.height*.65)};`);
+    const r=await js(band,`const r=document.querySelector('.screen-ink').getBoundingClientRect();return {x:Math.round(r.width*.4),y:Math.round(r.height*.65)};`);
     band.webContents.sendInputEvent({type:'mouseMove',x:r.x,y:r.y});band.webContents.sendInputEvent({type:'mouseDown',x:r.x,y:r.y,button:'left',clickCount:1});
     band.webContents.sendInputEvent({type:'mouseMove',x:r.x+120,y:r.y-80});band.webContents.sendInputEvent({type:'mouseUp',x:r.x+120,y:r.y-80,button:'left',clickCount:1});
   }

@@ -19,7 +19,7 @@ async function api(url,options={}){
   return response.status===204?{}:response.json();
 }
 const user=await api('https://api.github.com/user');if(user?.login!=='luisrodr123')throw new Error('A conta Git autenticada não corresponde ao proprietário dos repositórios.');
-const filenames=[`dist/StageSet-${version}-Portable-x64.exe`,`dist/StageSet-${version}-Setup-x64.exe`,`dist/host/StageSet-Host-${version}-Portable-x64.exe`,`dist/mobile/StageSet-Host-${version}-Android-Test.apk`,`dist/mobile/StageSet-Host-${version}-iOS-Project.zip`,'dist/SHA256SUMS.txt','STAGESET-ALTERACOES.md','docs/HOST-E-EVENTOS.md','docs/SHOWS-E-HOST-PORTATIL.md','docs/HOST-ANDROID-IOS.md','scripts/host-certificate.ps1'];
+const filenames=[`dist/StageSet-${version}-Portable-x64.exe`,`dist/StageSet-${version}-Setup-x64.exe`,`dist/host/StageSet-Host-${version}-Portable-x64.exe`,`dist/host/StageSet-Host-${version}-Setup-x64.exe`,`dist/mobile/StageSet-Host-${version}-Android-Test.apk`,`dist/mobile/StageSet-Host-${version}-iOS-Project.zip`,'dist/SHA256SUMS.txt','STAGESET-ALTERACOES.md','docs/HOST-E-EVENTOS.md','docs/SHOWS-E-HOST-PORTATIL.md','docs/HOST-ANDROID-IOS.md','scripts/host-certificate.ps1'];
 for(const file of filenames)await stat(file);
 const body=await readFile(`docs/RELEASE-${version.split('.').slice(0,2).join('.')}.md`,'utf8');
 for(const repo of repos){

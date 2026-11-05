@@ -1,6 +1,15 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {createMidiFromNotes,parseMidiFile,createKaraokeMidi} from '../midi.js';
+import {MidiPlayer,createMidiFromNotes,parseMidiFile,createKaraokeMidi} from '../midi.js';
 import {createBackup,readBackup} from '../backup.js';
+test('MIDI master adjusts synth gain and external CC7 without changing channel volume',()=>{
+  const player=new MidiPlayer(), messages=[], gains=[];
+  player.midiOutput={send:bytes=>messages.push(bytes)};
+  player.context={currentTime:1};player.master={gain:{setTargetAtTime:value=>gains.push(value)}};
+  player.setVolume(.8);player.setMixMasterVolume(.5);
+  assert.equal(gains.at(-1),.4);assert.equal(player.channelMix[0].volume,1);
+  assert.ok(messages.some(bytes=>bytes[0]===0xb0&&bytes[1]===7&&bytes[2]===51));
+  player.setMixMasterVolume(undefined);assert.equal(player.mixMasterVolume,1);
+});
 test('explicit 140 BPM and MIDI note timing survive import/export',async()=>{
   const file=createMidiFromNotes([{channel:0,note:60,velocity:100,time:0,endTime:1}],140);
   const buffer=file.buffer,parsed=parseMidiFile(buffer);

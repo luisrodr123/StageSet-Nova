@@ -1,6 +1,6 @@
 import { RATES,timecode,formatTimecode,fullFrame,quarterFrame,MtcDecoder } from './timecode.js';
 
-export function setupSync({getInputs,getOutputs,connectMidi,position,playing,seek,play,pause,speed,report}) {
+export function setupSync({getInputs,getOutputs,connectMidi,position,playing,seek,play,pause,speed,report,onMidiSent=()=>{},onMidiReceived=()=>{}}) {
   const $=id=>document.getElementById(id);
   let mode='off',timer=null,context=null,node=null,stream=null,source=null,input=null,decoder=new MtcDecoder();
   let next=0,part=0,frozen=null,wasPlaying=false,lastPosition=-1,lastClock=0,lastReceive=0,lastSeek=0,busy=false;
@@ -14,7 +14,7 @@ export function setupSync({getInputs,getOutputs,connectMidi,position,playing,see
     if(frame.running&&frame.direction!==-1&&!playing()&&!busy){busy=true;try{await play();}finally{busy=false;}}
     if(!frame.running&&playing())pause();
   };
-  const onMidi=event=>{if(mode==='mtc-read')void receive(decoder.push(event.data));};
+  const onMidi=event=>{onMidiReceived();if(mode==='mtc-read')void receive(decoder.push(event.data));};
   function refreshPorts(){
     for(const [id,ports] of [['sync-midi-in',getInputs()],['sync-midi-out',getOutputs()]]){
       const select=$(id),old=select.value;select.replaceChildren(new Option('Seleciona uma porta',''));
@@ -79,12 +79,12 @@ export function setupSync({getInputs,getOutputs,connectMidi,position,playing,see
       const output=getOutputs().find(p=>p.id===$('sync-midi-out').value);
       if(!output){void stop();report('A saída de timecode foi desligada.');return;}
       try{
-        if(discontinuity){output.send(fullFrame(timecode(pos,rate)));part=0;next=now;}
+        if(discontinuity){output.send(fullFrame(timecode(pos,rate)));onMidiSent();part=0;next=now;}
         // Resume at the actual playhead after a stalled timer; never burst stale timecode.
         if(now-next>50){part=0;next=now;}
         if(active && now>=next){
           if(part===0)frozen=timecode(pos,rate);
-          output.send(quarterFrame(frozen,part));part=(part+1)%8;next+=1000/(4*RATES[rate]*speed());
+          output.send(quarterFrame(frozen,part));onMidiSent();part=(part+1)%8;next+=1000/(4*RATES[rate]*speed());
         }
       }catch(error){void stop();report(`Timecode: ${error.message}. Ativa o acesso MIDI/SysEx.`);return;}
       lastPosition=pos;lastClock=now;

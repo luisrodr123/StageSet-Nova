@@ -42,9 +42,11 @@
           <button class="icon-button" id="help-button" title="Atalhos de teclado" aria-label="Atalhos de teclado">?</button>
           <button class="backup-button" id="settings-button" type="button" title="Configurações de áudio, MIDI e ecrãs">Configurações</button>
           <button class="backup-button" id="hosts-button" type="button" title="Hosts ligados ou visíveis">Hosts</button>
+          <details class="topbar-menu"><summary>Click BPM</summary><div class="topbar-menu-items"><label for="click-bpm">Andamento (BPM)</label><input id="click-bpm" type="number" min="20" max="300" step="1" value="120"><button class="backup-button" id="click-toggle" type="button" aria-pressed="false">Iniciar click</button><span id="click-status" role="status"></span></div></details>
+          <span class="midi-activity" title="Atividade MIDI nas portas utilizadas pelo StageSet"><span id="midi-in-indicator">IN</span><span id="midi-out-indicator">OUT</span></span>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.21</span>
+          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.22.0</span>
         </div>
       </header>
 
@@ -351,6 +353,7 @@
           <button class="backup-button midi-refresh-outputs" id="midi-refresh-outputs" type="button">Procurar portas MIDI</button>
           <p class="midi-mixer-description">Controla volume, panorâmica, Solo e timbres sintetizados por canal. As alterações de timbre também se aplicam durante a reprodução.</p>
           <p class="midi-mixer-description">Os 16 canais MIDI têm encaminhamento independente. Liga primeiro as interfaces no menu Pedais; depois escolhe uma porta em cada canal.</p>
+          <div class="mixer-view-controls"><button class="backup-button" id="midi-mixer-overview" type="button" aria-pressed="false">Visão geral</button><label>Zoom dos canais <input id="midi-mixer-zoom" type="range" min="56" max="160" step="4" value="88" aria-label="Largura dos canais MIDI"></label><output id="midi-mixer-zoom-value"></output></div>
           <div class="midi-mixer-list" id="midi-mixer-list"></div>
         </section>
       </div>
@@ -361,6 +364,7 @@
           <h2 id="audio-mixer-title">Mixer de áudio</h2>
           <p class="midi-mixer-description" id="audio-mixer-description">Controla volume, panorâmica, Solo e silêncio por canal.</p>
           <div class="audio-output-settings"><button id="choose-audio-output" type="button">Procurar interfaces</button><label for="audio-output-device">Dispositivo</label><select id="audio-output-device" aria-label="Interface áudio"><option value="default">Saída padrão</option></select><span id="audio-output-status">Saída do sistema · 1/2</span></div>
+          <div class="mixer-view-controls"><button class="backup-button" id="audio-mixer-overview" type="button" aria-pressed="false">Visão geral</button><label>Zoom dos canais <input id="audio-mixer-zoom" type="range" min="56" max="160" step="4" value="88" aria-label="Largura dos canais de áudio"></label><output id="audio-mixer-zoom-value"></output><button class="backup-button" id="audio-remove-selected" type="button" disabled>Remover pistas selecionadas</button><span>Seleciona pistas com ✓; Shift seleciona um intervalo.</span></div>
           <div class="audio-mixer-list" id="audio-mixer-list"></div>
         </section>
       </div>

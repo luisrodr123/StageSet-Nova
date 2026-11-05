@@ -11,7 +11,7 @@ async function run(){
   session.defaultSession.setPermissionCheckHandler((_,permission)=>permission==='fullscreen');
   session.defaultSession.setPermissionRequestHandler((_,permission,done)=>done(permission==='fullscreen'));
   const testRoot=process.env.STAGESET_TEST_ROOT||path.resolve(__dirname,'..');
-  const expectedVersion='v'+JSON.parse(await fs.readFile(path.join(testRoot,'package.json'),'utf8')).version.split('.').slice(0,2).join('.');
+  const expectedVersion='v'+JSON.parse(await fs.readFile(path.join(testRoot,'package.json'),'utf8')).version;
   const {createStageSetServer}=await import(pathToFileURL(path.join(testRoot,'server.mjs')).href);
   server=createStageSetServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   win=new BrowserWindow({show:false,width:1273,height:930,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,disableHtmlFullscreenWindowResize:true}});
@@ -60,7 +60,12 @@ async function run(){
   await evaluate(`
     window.getSongs=()=>new Promise((resolve,reject)=>{const open=indexedDB.open('stageset-library');open.onerror=()=>reject(open.error);open.onsuccess=()=>{const db=open.result,request=db.transaction('songs').objectStore('songs').getAll();request.onsuccess=()=>{db.close();resolve(request.result);};};});
     document.getElementById('audio-mixer-button').click();await until(()=>document.querySelector('.audio-channel-label input'),'Mixer name field missing');
+    const audioList=document.getElementById('audio-mixer-list'),audioView=document.getElementById('audio-mixer-overview'),audioZoom=document.getElementById('audio-mixer-zoom');
+    check(audioView.getAttribute('aria-pressed')==='true'&&audioZoom.disabled,'Audio overview default missing');
+    const bounds=audioList.getBoundingClientRect();for(const row of audioList.children){const rect=row.getBoundingClientRect();check(rect.left>=bounds.left-1&&rect.right<=bounds.right+1,'Audio overview does not fit');}
+    audioView.click();check(!audioZoom.disabled&&!audioList.classList.contains('mixer-overview'),'Audio zoom mode absent');audioZoom.value='120';audioZoom.dispatchEvent(new Event('input'));check(audioList.style.getPropertyValue('--mixer-strip-width')==='120px','Audio zoom not applied');audioView.click();
     const name=document.querySelector('.audio-channel-label input');name.value='Voz principal';name.dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('close-audio-mixer').click();
+    const midiList=document.getElementById('midi-mixer-list'),midiView=document.getElementById('midi-mixer-overview');document.getElementById('midi-mixer-modal').hidden=false;midiList.style.setProperty('--mixer-strip-count','17');for(let i=0;i<17;i++){const row=document.createElement('div');row.className='midi-channel-row';midiList.append(row);}midiView.click();const midiBounds=midiList.getBoundingClientRect();for(const row of midiList.children){const rect=row.getBoundingClientRect();check(rect.left>=midiBounds.left-1&&rect.right<=midiBounds.right+1,'MIDI overview does not fit');}check(document.getElementById('midi-mixer-zoom').disabled,'MIDI overview not active');midiList.replaceChildren();midiView.click();document.getElementById('midi-mixer-modal').hidden=true;
     document.getElementById('pedal-button').click();document.getElementById('add-pedal').click();check(document.querySelectorAll('.pedal-row').length===5,'Fifth pedal not added');
     document.getElementById('setlist-cc-enabled').checked=true;document.getElementById('setlist-cc-enabled').dispatchEvent(new Event('change'));
     for(const type of ['cc','program','note','song']){

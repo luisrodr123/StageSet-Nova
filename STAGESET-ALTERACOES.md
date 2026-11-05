@@ -1,7 +1,68 @@
 # StageSet — alterações anotadas
 
-## Versão 0.21.0 — em desenvolvimento
+## Versão 0.22.0 — preparação para teste
 
+- Inclui as alterações da série 0.21.1–0.21.8 e a opção de mostrar/ocultar eventos MIDI e DMX em cada ecrã de letras. A opção é guardada localmente por ecrã.
+- Os dispositivos de áudio e MIDI, o Host em tablet físico e a interface USB DMX ainda necessitam de validação com equipamento real.
+- Verificações automatizadas de sintaxe, eventos MIDI, backup, pasta de show, interface, rede e Host com toque simulado passaram. Os executáveis e a app Android destinam-se a testes antes da utilização ao vivo.
+- Verificações finais: 32 testes automatizados e o teste geral Electron passaram; o Host portátil 0.22.0 abriu e recebeu letras com perfil de teste isolado. O APK Android foi compilado em modo de teste; não foi instalado num dispositivo físico.
+
+## Versão 0.21.8 — em desenvolvimento
+
+- Escape fecha as janelas independentes e o mosaico; primeiro sai do ecrã inteiro, termina o desenho ou pede confirmação ao fechar um editor alterado.
+- Indicadores MIDI incluem eventos das letras, editor multipista e mensagens MTC, além do leitor e da entrada de pedal.
+
+
+## Versão 0.21.7 — em desenvolvimento
+
+- Pasta do show: exportação das imagens de fundo e letras identificadas por janela; pastas de temas distinguem nomes repetidos sem depender de maiúsculas e evitam nomes reservados no Windows.
+- Escape fecha os controlos e o editor de letras das janelas; pede confirmação antes de descartar um rascunho alterado. Escape fecha também o diálogo de inserção de eventos.
+- Falta confirmar a experiência com dispositivos físicos e rever Escape nas restantes janelas antes de gerar a versão 0.22.
+
+
+## Versão 0.21.6 — em desenvolvimento
+
+- Click BPM independente com andamento introduzido manualmente, e indicadores de atividade MIDI para mensagens recebidas na entrada ativa e enviadas pelo leitor.
+- Medidores de nível de áudio no mixer ligados aos sinais reais dos canais, pistas e master; pistas voltam a ser encaminhadas quando o grafo do mixer é reconstruído.
+- Seleção de pistas importadas por botão e por intervalo com Shift; remoção múltipla pede confirmação e preserva ficheiros originais.
+- Verificações de sintaxe/versão, MIDI/backup e teste geral em Electron passaram, incluindo Host com toque simulado. O click, os níveis e as portas MIDI ainda precisam de confirmação com equipamento real.
+- Pendentes: auditar importação integral para pasta de show, rever Escape em todas as janelas, validar indicadores e níveis com dispositivos físicos e preparar versões finais 0.22.
+
+
+## Versão 0.21.5 — em desenvolvimento
+
+- Mosaico de letras com Visão geral adaptada à janela e zoom manual dos painéis.
+- Teste tátil do Host ajustado para desenhar fora da barra lateral; passou com eventos táteis simulados no Chromium, incluindo gravação, redimensionamento por dois dedos e reconexão. Ainda requer validação em dispositivo físico.
+- Verificações de sintaxe/versão, MIDI/backup e integração geral passaram.
+- Ainda pendentes para a versão 0.22: importação completa para pasta de show, clique BPM, medidores reais de áudio, indicadores MIDI, seleção/remoção múltipla de pistas e revisão de Escape em todas as janelas.
+
+
+## Versão 0.21.4 — em desenvolvimento
+
+- Corrigida a gravação das definições de eventos MIDI inseridos no editor e o posicionamento do evento no cursor; o marcador técnico fica oculto na apresentação das letras.
+- Mixer de áudio: Solo e Mute alinhados antes do fader para canais e pistas, com fundo amarelo em Solo e vermelho em Mute; nomes mais legíveis ao lado do número. Indicador master decorativo removido até existirem medidores reais.
+- A setlist recolhe controlos secundários quando estreita para preservar o título.
+- Pendentes das novas anotações: importação completa para pasta de show, overview/zoom do mosaico, clique BPM, medidores reais de áudio, indicadores MIDI, seleção/remoção múltipla de pistas e fecho das janelas com Escape.
+- Verificação: sintaxe, versão, testes MIDI/backup e inserção de MIDI/DMX/imagem/vídeo passaram. O teste geral terminou com falha na persistência de desenho tátil no Host, que continua por investigar.
+
+
+## Versão 0.21.3 — em desenvolvimento
+
+- Ambos os mixers têm Visão geral, que ajusta todos os canais e o master à janela, e zoom manual para definir a largura das tiras na vista normal. A escolha de cada mixer fica guardada neste dispositivo.
+- Validação: verificação de sintaxe/versão, testes MIDI/backup e testes de ajuste horizontal dos mixers passaram. O teste geral prosseguiu até falhar na validação de eventos MIDI inseridos no editor de letras; este ponto anterior continua por resolver.
+
+
+## Versão 0.21.2 — em desenvolvimento
+
+- Incremento de versão após as alterações ao master MIDI, aos botões Setlist/Biblioteca e ao modo Desenhar. O número completo aparece na aplicação e o comando de versão passa a incrementar a versão de correção.
+
+## Versão 0.21.1 — em desenvolvimento
+
+- Mixer de áudio alinhado ao mixer MIDI: strips horizontais estreitos, faders de volume verticais, pan horizontal, canais dimensionados para caber na janela sem deslocamento lateral e fader MASTER ligado ao ganho geral e guardado por música.
+- Mixer MIDI com fader MASTER guardado por música, aplicado ao sintetizador interno e às saídas MIDI através do volume de canal (CC7).
+- Setlist e Biblioteca nos ecrãs de letras abrem e fecham no mesmo botão. No modo Desenhar, a música continua e a posição da letra fica suspensa até fechar o painel de desenho.
+- Verificação: sintaxe, versão e testes de MIDI/backup passaram; falta confirmar a utilização com interfaces MIDI físicas.
+- Atualização das novas anotações: mixer MIDI aproximado a uma consola DAW, com strips estreitos lado a lado, secção de canal no topo, controlo horizontal de pan, fader vertical longo, Mute/Solo no rodapé e deslocamento horizontal quando necessário; eventos MIDI inseridos em sintaxe legível `[midi: ...]`; diálogo de eventos reduzido; destaque de foco visível e separação maior entre versos no editor.
 - Fecho da auditoria das anotações: ecrãs, Hosts, setlists, Show, mixer, mosaico, editor multipista, eventos e gravação por janela estão ligados e testados.
 - Inclui compatibilidade com Show/Setlist de versões anteriores e pastas `media` identificadas pelo nome do tema.
 

@@ -1,12 +1,14 @@
 import {createZip} from './zip-store.js';
-export const showSafeName=name=>String(name||'ficheiro').replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/[. ]+$/,'').slice(0,100)||'ficheiro';
-export async function showFiles(songs){
- const files=[],add=async(path,blob)=>{if(blob instanceof Blob)files.push({path,bytes:await blob.arrayBuffer()});},used=new Map();
- for(const song of songs){const base=showSafeName(song.title||song.fileName||'Tema'),count=(used.get(base)||0)+1;used.set(base,count);const folder=count>1?`${base}-${count}`:base,dir='media/'+folder+'/';await add(dir+'audio-'+showSafeName(song.fileName),song.audioBlob);await add(dir+'midi-'+showSafeName(song.midiFileName||'faixa.mid'),song.midiBlob);await add(dir+'cdg-'+showSafeName(song.cdgFileName||'faixa.cdg'),song.cdgBlob);
+export const showSafeName=name=>{const safe=String(name||'ficheiro').replace(/[<>:"/\\|?*\x00-\x1f]/g,'-').replace(/[. ]+$/,'').slice(0,100)||'ficheiro';return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(safe)?'_'+safe:safe;};
+export async function showFiles(songs,outputs=[],mainBackground=null){
+ const files=[],add=async(path,blob)=>{if(blob instanceof Blob)files.push({path,bytes:await blob.arrayBuffer()});},used=new Set();
+ for(const song of songs){const base=showSafeName(song.title||song.fileName||'Tema');let folder=base,n=2;while(used.has(folder.toLocaleLowerCase('en-US')))folder=`${base}-${n++}`;used.add(folder.toLocaleLowerCase('en-US'));const dir='media/'+folder+'/';await add(dir+'audio-'+showSafeName(song.fileName),song.audioBlob);await add(dir+'midi-'+showSafeName(song.midiFileName||'faixa.mid'),song.midiBlob);await add(dir+'cdg-'+showSafeName(song.cdgFileName||'faixa.cdg'),song.cdgBlob);
   for(const [i,stem] of (song.audioStems||[]).entries())await add(dir+'stem-'+i+'-'+showSafeName(stem.fileName||stem.name||'audio.wav'),stem.blob);
-  for(const [output,text] of Object.entries({main:song.lyricsText||'',...song.lyricOutputLyrics}))await add(dir+'letras-'+showSafeName(output)+'.txt',new Blob([text],{type:'text/plain'}));
+  for(const [output,text] of Object.entries({main:song.lyricsText||'',...song.lyricOutputLyrics})){const name=output==='main'?'Palco principal':(outputs.find(item=>item.id===output)?.name||output)+'-'+output;await add(dir+'letras-'+showSafeName(name)+'.txt',new Blob([text],{type:'text/plain'}));}
   for(const event of song.lyricEvents||[])if(event.data)await add(dir+'evento-'+showSafeName(event.id)+'-'+showSafeName(event.name),await(await fetch(event.data)).blob());
- }return files;
+ }
+ for(const output of [{id:'main',name:'Palco principal',background:mainBackground},...outputs]){const image=output.background?.image;if(typeof image==='string'&&/^data:image\/(?:png|jpeg|webp);base64,/i.test(image)){const type=image.match(/^data:image\/(png|jpeg|webp)/i)[1].toLowerCase(),ext=type==='jpeg'?'jpg':type;await add('fundos/'+showSafeName(output.name+'-'+output.id)+'.'+ext,await(await fetch(image)).blob());}}
+ return files;
 }
 function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 function browserFolder(){let root;

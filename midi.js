@@ -470,10 +470,12 @@ export class MidiPlayer {
     this.rate = 1;
     this.transpose = 0;
     this.volume = 0.8;
+    this.mixMasterVolume = 1;
     this.playing = false;
     this.timer = null;
     this.onTime = () => {};
     this.onEnded = () => {};
+    this.onMidiSent = () => {};
     this.midiOutput = null;
     this.channelOutputs = Array(16).fill(undefined);
   }
@@ -498,7 +500,7 @@ export class MidiPlayer {
       if (!Context) throw new Error("Este navegador não disponibiliza Web Audio para reprodução MIDI.");
       this.context = new Context();
       this.master = this.context.createGain();
-      this.master.gain.value = this.volume;
+      this.master.gain.value = this.volume * this.mixMasterVolume;
       this.master.connect(this.context.destination);
       this.noiseBuffer = this.context.createBuffer(1, this.context.sampleRate * 2, this.context.sampleRate);
       const noise = this.noiseBuffer.getChannelData(0);
@@ -726,7 +728,7 @@ export class MidiPlayer {
     const channel = status & 0x0f;
     const output = this.channelOutputs[channel] === undefined ? this.midiOutput : this.channelOutputs[channel];
     if (!output) return;
-    try { output.send(bytes, this.outputTimestamp(audioTime)); } catch {}
+    try { output.send(bytes, this.outputTimestamp(audioTime)); this.onMidiSent(); } catch {}
   }
 
   clearMidiOutput() {
@@ -794,7 +796,7 @@ export class MidiPlayer {
     const settings = this.channelMix[channel];
     const hasSolo = this.channelMix.some((setting) => setting.solo);
     if (!settings || settings.muted || (hasSolo && !settings.solo)) return 0;
-    return Math.round(127 * this.volume * settings.volume * (this.controllerValues[channel]?.volume ?? 1));
+    return Math.round(127 * this.volume * this.mixMasterVolume * settings.volume * (this.controllerValues[channel]?.volume ?? 1));
   }
 
   sendMidiChannelMix(channel, audioTime = this.context?.currentTime ?? 0) {
@@ -860,7 +862,13 @@ export class MidiPlayer {
 
   setVolume(volume) {
     this.volume = Math.max(0, Math.min(1, volume));
-    if (this.master && this.context) this.master.gain.setTargetAtTime(this.volume, this.context.currentTime, 0.015);
+    if (this.master && this.context) this.master.gain.setTargetAtTime(this.volume * this.mixMasterVolume, this.context.currentTime, 0.015);
+    for (let channel = 0; channel < 16; channel++) this.sendMidiChannelMix(channel);
+  }
+
+  setMixMasterVolume(volume) {
+    this.mixMasterVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
+    if (this.master && this.context) this.master.gain.setTargetAtTime(this.volume * this.mixMasterVolume, this.context.currentTime, 0.015);
     for (let channel = 0; channel < 16; channel++) this.sendMidiChannelMix(channel);
   }
 

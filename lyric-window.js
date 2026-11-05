@@ -4,6 +4,7 @@ const output=new URLSearchParams(location.search).get('output');
 const send=data=>opener?.postMessage({...data,output},location.origin);
 const size=document.querySelector('#size'),display=document.querySelector('#display'),stage=document.querySelector('#stage'),lines=document.querySelector('#lines');
 const screen=createLyricsScreen({host:stage,viewport:lines,request:screenClient(output),extraControls:document.querySelector('#output-controls')});
+addEventListener('keydown',event=>{if(event.key!=='Escape'||event.defaultPrevented)return;if(document.fullscreenElement)return;if(stage.dataset.paint==='true'){event.preventDefault();stage.querySelector('[data-screen="close-paint"]')?.click();return;}const editor=stage.querySelector('.screen-editor:not([hidden]) textarea');if(editor){event.preventDefault();editor.focus();editor.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));return;}if(opener){event.preventDefault();window.close();}});
 size.oninput=()=>{const value=Number(size.value);if(Number.isInteger(value)&&value>=16&&value<=96)send({type:'stageset-output-setting',fontSize:value});};
 display.onchange=()=>send({type:'stageset-output-setting',displayId:display.value});
 addEventListener('message',event=>{

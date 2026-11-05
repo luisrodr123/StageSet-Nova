@@ -27,10 +27,11 @@ export function createLyricsScreen({host, viewport, request, extraControls, font
     <div class="screen-panel" hidden>
       <div class="screen-row"><button type="button" data-screen="back" title="Consultar linhas anteriores, sem deslocar o áudio">↑ Anterior</button><button type="button" data-screen="forward" title="Consultar linhas seguintes, sem deslocar o áudio">↓ Seguinte</button><button type="button" data-screen="focus">Voltar ao foco</button></div>
       <div class="screen-row"><button type="button" data-screen="fullscreen">⛶ Ecrã inteiro</button><button type="button" data-screen="edit">Editar letras</button><button type="button" data-screen="paint" aria-pressed="false">✎ Desenhar</button></div>
-      ${navigation?'<div class="screen-row screen-nav-tools"><button type="button" data-screen="setlist-view">☷ Setlist</button><button type="button" data-screen="library-view">♫ Biblioteca</button></div>':''}
+      ${navigation?'<div class="screen-row screen-nav-tools"><button type="button" data-screen="setlist-view" aria-pressed="false">☷ Setlist</button><button type="button" data-screen="library-view" aria-pressed="false">♫ Biblioteca</button></div>':''}
       ${fontControl?'<div class="screen-row"><button type="button" data-screen="smaller" aria-label="Diminuir letra">A−</button><label>Letra <input type="range" data-screen="font" min="14" max="120" step="1"><output data-screen="font-value"></output></label><button type="button" data-screen="larger" aria-label="Aumentar letra">A+</button><button type="button" data-screen="font-reset">Tamanho do StageSet</button><small>Dois dedos ajustam a letra, também no modo Desenhar.</small></div>':''}
-      <div class="screen-row screen-brushes" hidden><label>Cor <input type="color" data-screen="color" value="#ffdb4d"></label><label>Traço <input type="range" data-screen="width" min="2" max="30" value="5"></label><button type="button" data-screen="eraser" aria-pressed="false">Borracha</button><button type="button" data-screen="undo">Anular</button><button type="button" data-screen="clear">Limpar</button></div>
+      <div class="screen-row screen-brushes" hidden><button type="button" data-screen="close-paint">Fechar desenho</button><label>Cor <input type="color" data-screen="color" value="#ffdb4d"></label><label>Traço <input type="range" data-screen="width" min="2" max="30" value="5"></label><button type="button" data-screen="eraser" aria-pressed="false">Borracha</button><button type="button" data-screen="undo">Anular</button><button type="button" data-screen="clear">Limpar</button></div>
       <div class="screen-row"><button type="button" data-screen="pdf">Exportar PDF</button><button type="button" data-screen="save-window">Guardar janela</button><button type="button" data-screen="anchor">Fixar notas antigas às linhas visíveis</button></div>
+      <div class="screen-row"><label><input type="checkbox" data-screen="show-events"> Mostrar eventos MIDI/DMX</label></div>
       <div class="screen-extra screen-row"></div>
       <div class="screen-row"><label>Opacidade <input type="range" data-screen="opacity" min="10" max="100" step="5" value="65"><output data-screen="opacity-value">65%</output></label><label><input type="checkbox" data-screen="autohide" checked> Recolher menu</label></div>
       <small>Roda ou arrasta a letra. Após 5 s sem interação, regressa ao foco.</small>
@@ -62,10 +63,11 @@ export function createLyricsScreen({host, viewport, request, extraControls, font
   el('opacity').oninput = () => {prefsDirty=true;setPrefs({...prefs,opacity:Number(el('opacity').value)});};
   el('opacity').onchange = persistPrefs;
   el('autohide').onchange = () => {setPrefs({...prefs,autoHide:el('autohide').checked});void persistPrefs();};
+  el('show-events').onchange = () => {host.dataset.showEvents=String(el('show-events').checked);try{localStorage.setItem('stageset-show-events-'+(context.output||'main'),host.dataset.showEvents);}catch{}};
   el('menu').onclick = () => {panel.hidden = !panel.hidden;el('menu').setAttribute('aria-expanded',String(!panel.hidden));wake();};
   toolbar.addEventListener('pointermove',wake);
-  toolbar.addEventListener('keydown',event => event.stopPropagation());
-  editor.addEventListener('keydown',event => {event.stopPropagation();if(event.key==='Escape'){event.preventDefault();editor.querySelector('.screen-edit-status').textContent='Usa Guardar ou Cancelar para fechar o rascunho.';}});
+  toolbar.addEventListener('keydown',event => {event.stopPropagation();if(event.key==='Escape'){event.preventDefault();if(paint)setPaint(false);else{panel.hidden=true;el('menu').setAttribute('aria-expanded','false');}}});
+  editor.addEventListener('keydown',event => {event.stopPropagation();if(event.key==='Escape'){event.preventDefault();if(editingBusy)return;if(draft&&editor.querySelector('textarea').value!==draft.text&&!confirm('Fechar o editor e descartar as alterações não guardadas nesta janela?'))return;editor.hidden=true;draft=null;wake();}});
   function currentLine() {return viewport.querySelector('.current') || viewport.querySelector('.lyric-line,.line');}
   function centerFocus() {
     const line = currentLine();
@@ -73,6 +75,7 @@ export function createLyricsScreen({host, viewport, request, extraControls, font
   }
   function focus() {manualUntil=0;clearTimeout(focusTimer);host.dataset.manual='false';centerFocus();el('focus').textContent='Voltar ao foco';}
   function hold() {
+    if (paint) { manualUntil = Number.POSITIVE_INFINITY; manualTop=viewport.scrollTop; host.dataset.manual='true'; clearTimeout(focusTimer); return; }
     manualUntil = performance.now()+5000;manualTop=viewport.scrollTop;host.dataset.manual='true';
     clearTimeout(focusTimer); focusTimer=setTimeout(focus,5000);el('focus').textContent='Foco em 5 s';
   }
@@ -118,9 +121,9 @@ export function createLyricsScreen({host, viewport, request, extraControls, font
   el('pdf').onclick=async()=>{try{await exportLyricsPdf(viewport,strokes,(context.title||'Letras')+' - '+(context.name||'Palco principal'));message('PDF exportado com letras e anotações.');}catch(error){message(error.message);}};
   el('save-window').onclick=()=>{const payload={version:1,window:context.name||context.output||'Palco principal',songId:context.songId||null,title:context.title||'Letras',lyrics:[...viewport.querySelectorAll('.lyric-line')].map(line=>line.textContent).join('\n'),strokes,updatedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=(payload.title+'-'+payload.window).replace(/[^\w.-]+/g,'_')+'.stageset-window.json';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);message('Janela guardada com letras e anotações.');};
   el('anchor').onclick=()=>{const r=canvas.getBoundingClientRect(),rows=inkRows(viewport);if(!rows.length)return;strokes=strokes.map(s=>s.anchors?s:{...s,lineWidth:Math.min(2,s.width*Math.min(r.width,r.height)/Math.max(1,rows[0].rect.height)),anchors:s.points.map(([x,y])=>anchorPoint(rows,r.left+x*r.width,r.top+y*r.height))});changedDrawing();};
-  function renderNavigation(kind){if(!nav||!navigation)return;const data=navigation[kind]?.()||{title:kind==='setlist'?'Setlist':'Biblioteca',items:[]};nav.replaceChildren();const h=document.createElement('h2');h.textContent=data.title;nav.append(h);const list=document.createElement('ol');for(const item of data.items||[]){const row=document.createElement('li');if(item.current)row.className='current';const button=document.createElement('button');button.type='button';button.textContent=item.title;button.title=item.title;button.onclick=()=>{navigation.select?.(item.id);renderNavigation(kind);};row.append(button);list.append(row);}nav.append(list);nav.hidden=false;host.dataset.navigation=kind;}
-  function hideNavigation(){if(nav){nav.hidden=true;delete host.dataset.navigation;}}
-  if(nav){el('setlist-view').onclick=()=>renderNavigation('setlist');el('library-view').onclick=()=>renderNavigation('library');}
+  function renderNavigation(kind){if(!nav||!navigation)return;const data=navigation[kind]?.()||{title:kind==='setlist'?'Setlist':'Biblioteca',items:[]};nav.replaceChildren();const h=document.createElement('h2');h.textContent=data.title;nav.append(h);const list=document.createElement('ol');for(const item of data.items||[]){const row=document.createElement('li');if(item.current)row.className='current';const button=document.createElement('button');button.type='button';button.textContent=item.title;button.title=item.title;button.onclick=()=>{navigation.select?.(item.id);renderNavigation(kind);};row.append(button);list.append(row);}nav.append(list);nav.hidden=false;host.dataset.navigation=kind;el('setlist-view').setAttribute('aria-pressed',String(kind==='setlist'));el('library-view').setAttribute('aria-pressed',String(kind==='library'));}
+  function hideNavigation(){if(nav){nav.hidden=true;delete host.dataset.navigation;el('setlist-view').setAttribute('aria-pressed','false');el('library-view').setAttribute('aria-pressed','false');}}
+  if(nav){const toggle=kind=>{if(!nav.hidden&&host.dataset.navigation===kind)hideNavigation();else renderNavigation(kind);};el('setlist-view').onclick=()=>toggle('setlist');el('library-view').onclick=()=>toggle('library');}
   const fullscreenChanged=()=>{const full=document.fullscreenElement===host;el('fullscreen').textContent=full?'⛶ Sair de ecrã inteiro':'⛶ Ecrã inteiro';if(!full)hideNavigation();resize();};
   document.addEventListener('fullscreenchange',fullscreenChanged);
   function redraw() {
@@ -137,8 +140,9 @@ export function createLyricsScreen({host, viewport, request, extraControls, font
   let resizeFrame;
   const observer=new ResizeObserver(()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});observer.observe(host);observer.observe(viewport);
   function drawingButtons() {for(const name of ['undo','clear'])el(name).disabled=!!context.readOnly||!strokes.length||loadingNotes||saving;el('paint').disabled=!!context.readOnly||!key()||loadingNotes;el('anchor').disabled=!!context.readOnly;el('retry').hidden=!dirty||saving;}
-  function setPaint(value) {paint=value;host.dataset.paint=String(value);el('paint').setAttribute('aria-pressed',String(value));toolbar.querySelector('.screen-brushes').hidden=!value;onPaintState?.(paint);wake();}
+  function setPaint(value) {if(paint===value)return;paint=value;host.dataset.paint=String(value);el('paint').setAttribute('aria-pressed',String(value));const brushes=toolbar.querySelector('.screen-brushes');if(value){toolbar.append(brushes);brushes.hidden=false;manualTop=viewport.scrollTop;manualUntil=Number.POSITIVE_INFINITY;host.dataset.manual='true';clearTimeout(focusTimer);}else{panel.insertBefore(brushes,panel.querySelector('.screen-row'));brushes.hidden=true;manualUntil=0;host.dataset.manual='false';centerFocus();}panel.hidden=!!value;toolbar.dataset.paintMode=String(value);el('menu').setAttribute('aria-expanded',String(!value));onPaintState?.(paint);wake();}
   el('paint').onclick=()=>setPaint(!paint);
+  el('close-paint').onclick=()=>setPaint(false);
   el('eraser').onclick=()=>{eraser=!eraser;el('eraser').setAttribute('aria-pressed',String(eraser));};
   async function saveDrawing() {
     if(!key()||saving||!dirty)return;
@@ -190,6 +194,7 @@ export function createLyricsScreen({host, viewport, request, extraControls, font
   attachEventInserter(editor.querySelector('textarea'),{root:editor,context:()=>context.canInsertEvents===false?null:draft&&({...draft,position:context.position}),save:(ctx,event)=>request('event-save',{songId:ctx.songId,event})});
   function update(data) {
     const changed=context.songId!==data.songId||context.output!==data.output;context=data;showFont();
+    if(changed){let visible=false;try{visible=localStorage.getItem('stageset-show-events-'+(context.output||'main'))==='true';}catch{}host.dataset.showEvents=String(visible);el('show-events').checked=visible;}
     if(changed){generation++;manualUntil=0;clearTimeout(focusTimer);lastFocus=null;stroke=null;strokes=[];revision=0;dirty=false;saving=false;loadingNotes=false;setPaint(false);redraw();void loadDrawing();}
     else if(key()&&!dirty&&!saving&&!loadingNotes&&Number(data.annotationVersion||0)!==revision)void loadDrawing();
     const nextPrefs=screenPreferences(data.overlay);if(!prefsDirty&&JSON.stringify(nextPrefs)!==JSON.stringify(prefs))setPrefs(nextPrefs);

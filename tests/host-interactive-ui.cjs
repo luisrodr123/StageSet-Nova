@@ -42,7 +42,7 @@ module.exports=async({win,host,children})=>{
     await wait(()=>js(receiver,`return Number(document.querySelector('[data-screen=font]').value)>${size}`),'Pinch did not resize lyrics');
     const zoom=await js(receiver,`return Number(document.querySelector('[data-screen=font]').value)`);
     await js(receiver,`document.querySelector('[data-screen=paint]').click();document.querySelector('.screen-panel').hidden=true;`);
-    const point=await js(receiver,`const line=document.querySelector('#lines .current')||document.querySelector('#lines .line'),r=line.getBoundingClientRect();return {x:Math.round(r.left+40),y:Math.round(r.top+r.height/2)};`);
+    const point=await js(receiver,`const line=document.querySelector('#lines .current')||document.querySelector('#lines .line'),r=line.getBoundingClientRect();return {x:Math.round(r.left+r.width*.55),y:Math.round(r.top+r.height/2)};`);
     const previousCount=song.lyricAnnotations?.['2']?.strokes.length||0;
     await receiver.webContents.debugger.sendCommand('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...point,id:1}]});
     await receiver.webContents.debugger.sendCommand('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:point.x+100,y:point.y+8,id:1}]});

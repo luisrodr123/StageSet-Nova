@@ -1,6 +1,7 @@
 import localPort from './local-port.cjs';
 import test from 'node:test';import assert from 'node:assert/strict';import dgram from 'node:dgram';
-import {HostServer} from '../desktop/host-server.cjs';import {DmxOutput,artDmx} from '../desktop/dmx.cjs';import {validateEvent,eventMidiBytes,withEventRows} from '../lyric-events.js';import {validateDrawing} from '../screen-data.js';import {createBackup,readBackup} from '../backup.js';
+import {HostServer} from '../desktop/host-server.cjs';import {DmxOutput,artDmx} from '../desktop/dmx.cjs';import {validateEvent,eventMidiBytes,eventMarkup,withEventRows} from '../lyric-events.js';import {validateDrawing} from '../screen-data.js';import {createBackup,readBackup} from '../backup.js';
+test('inserted MIDI cue renders a toggleable label and retains its event reference',()=>{const markup=eventMarkup('[midi@01:34.50: CC10.64@1][stage:abc-123]');assert.match(markup,/class="lyric-event-label"/);assert.match(markup,/data-event-id="abc-123"/);assert.doesNotMatch(markup,/\[stage:/);});
 test('line anchors survive validation and MIDI event types produce exact bytes',()=>{
  const stroke={tool:'pen',color:'#ffffff',width:.005,lineWidth:.1,points:[[.3,.4]],anchors:[{line:2,key:'abc:0',x:.3,y:.8}]};assert.deepEqual(validateDrawing([stroke])[0],stroke);assert.throws(()=>validateDrawing([{...stroke,anchors:[{...stroke.anchors[0],line:-1}]}]));
  for(const [message,number,value,bytes] of [['cc',7,100,[0xb3,7,100]],['program',12,0,[0xc3,12]],['pitch',0,8192,[0xe3,0,64]],['noteOff',60,0,[0x83,60,0]],['song',15,0,[0xf3,15]]])assert.deepEqual(eventMidiBytes(validateEvent({kind:'midi',time:2,channel:4,message,number,value})),bytes);

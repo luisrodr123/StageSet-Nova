@@ -679,6 +679,8 @@ function normalizeSongAudioMix(song, channelCount) {
 
 function applyAudioMix(song) {
   if (!song || song.id !== audioMixerSongId) return;
+  const masterVolume = Math.max(0, Math.min(1, Number.isFinite(song.audioMasterVolume) ? song.audioMasterVolume : 1));
+  if (audioMixerMaster && pitchContext) audioMixerMaster.gain.setTargetAtTime(masterVolume, pitchContext.currentTime, 0.015);
   const channelCount = audioMixerChannels.length;
   const settings = normalizeSongAudioMix(song, channelCount);
   const hasSolo = settings.some((channel) => channel.solo);
@@ -756,6 +758,7 @@ async function ensureAudioMixerGraph(song = selectedSong(), force = false) {
       rightPan.connect(audioMixerMerger, 0, pair * 2 + 1);
       audioMixerChannels.push({ gain, leftPan, rightPan, outputPair: pair });
     }
+    for (const player of stemPlayers) routeStemOutput(player, player.outputPair);
     audioMixerSongId = song.id;
     audioMixerChannelCount = channelCount;
     audioMixerMaster.connect(pitchNode ?? pitchContext.destination);
@@ -838,17 +841,47 @@ function persistAudioStemMix(song) {
   dbPut(song).catch(() => toast("Não foi possível guardar a mistura das pistas."));
 }
 
+let stopAudioMeters = () => {};
+let selectedStemSong = null, selectedStemIds = new Set(), lastStemIndex = null;
+function startAudioMeters(container) {
+  stopAudioMeters();
+  const meters = [];
+  for (const row of container.querySelectorAll('.audio-channel-row')) {
+    const source = row.classList.contains('audio-master-strip') ? audioMixerMaster : row.dataset.stem ? stemPlayers.find(player => player.id === row.dataset.stem)?.gain : audioMixerChannels[Number(row.dataset.channel)]?.gain;
+    if (!source || !pitchContext) continue;
+    const analyser = pitchContext.createAnalyser(); analyser.fftSize = 256; source.connect(analyser);
+    const meter = document.createElement('span'); meter.className = 'audio-level-meter'; meter.setAttribute('aria-label','Nível de áudio');
+    const fill = document.createElement('span'); meter.append(fill); row.append(meter);
+    meters.push({source, analyser, fill, samples:new Float32Array(analyser.fftSize)});
+  }
+  let frame = 0, stopped = false;
+  const stop = () => { if (stopped) return; stopped=true;cancelAnimationFrame(frame);for(const item of meters){try{item.source.disconnect(item.analyser);}catch{}item.analyser.disconnect();} };
+  stopAudioMeters = stop;
+  function update() {
+    if (stopped) return;
+    if ($('#audio-mixer-modal').hidden || !container.isConnected) { stop(); return; }
+    for (const item of meters) { item.analyser.getFloatTimeDomainData(item.samples);let sum=0;for(const sample of item.samples)sum+=sample*sample;const rms=Math.sqrt(sum/item.samples.length);const db=rms>0?20*Math.log10(rms):-60;item.fill.style.transform=`scaleY(${Math.max(0,Math.min(1,(db+60)/60))})`; }
+    frame=requestAnimationFrame(update);
+  }
+  frame=requestAnimationFrame(update);
+}
+
 function renderAudioMixer() {
   const song = selectedSong();
   if (!song || isMidiSong(song) || isDocumentSong(song)) return toast("Escolhe primeiro um ficheiro de áudio.");
+  if (selectedStemSong !== song.id) { selectedStemSong = song.id; selectedStemIds.clear(); lastStemIndex = null; }
+  selectedStemIds = new Set([...selectedStemIds].filter(id => (song.audioStems ?? []).some(stem => stem.id === id)));
+  $('#audio-remove-selected').disabled = !selectedStemIds.size;
   refreshAudioOutputDevices();
   const channelCount = Math.max(1, Math.min(32, Number.isInteger(song.audioChannels) ? song.audioChannels : 2));
   const controlCount = audioMixerControlCount(song, channelCount);
   const container = $("#audio-mixer-list");
   container.innerHTML = "";
+  container.style.setProperty("--audio-strip-count", String(controlCount + (song.audioStems?.length ?? 0) + 1));
   ensureAudioMixerGraph(song, true).then(() => {
     if (selectedSong()?.id !== song.id || $("#audio-mixer-modal").hidden) return;
     const settings = song.audioMix;
+    const masterVolume = Math.max(0, Math.min(1, Number.isFinite(song.audioMasterVolume) ? song.audioMasterVolume : 1));
     $("#audio-mixer-description").textContent = song.audioFormat === "mogg"
       ? `MOGG v10 sem cifragem · ${channelCount} canais mono independentes. Volume, pan, Solo e silêncio por canal.`
       : channelCount > 2
@@ -861,6 +894,7 @@ function renderAudioMixer() {
       const detail = `Saída mono · canal ${channel + 1}`;
       const row = document.createElement("div");
       row.className = "audio-channel-row";
+      row.dataset.channel = String(channel);
       row.dataset.learnScope="audio-channel-"+channel;
       row.innerHTML = `<div class="audio-channel-label"><strong></strong><span>Canal ${channel + 1}</span></div><label class="midi-mix-control"><span>Volume</span><output></output><input class="audio-channel-volume" type="range" min="0" max="1" step="0.01" /></label><label class="midi-mix-control"><span>Pan</span><output></output><input class="audio-channel-pan" type="range" min="-1" max="1" step="0.01" /></label><label class="midi-mix-control audio-output-pair-control"><span>Saída</span><select class="audio-channel-output"></select></label><button class="midi-channel-solo audio-channel-solo" type="button"></button><button class="midi-channel-mute audio-channel-mute" type="button"></button>`;
       const channelName = document.createElement("input"); channelName.value = song.audioChannelNames?.[channel] || label; channelName.maxLength = 80; channelName.setAttribute("aria-label", `Nome do canal ${channel + 1}`);
@@ -909,6 +943,7 @@ function renderAudioMixer() {
       const solo = row.querySelector(".audio-channel-solo");
       const updateButtons = () => {
         const hasSolo = song.audioMix.some((item) => item.solo) || (song.audioStems ?? []).some((item) => item.solo);
+        row.dataset.solo = String(setting.solo); row.dataset.muted = String(setting.muted);
         const audible = !setting.muted && (!hasSolo || setting.solo);
         row.classList.toggle("muted", !audible);
         mute.textContent = setting.muted ? "Unmute" : "Mute";
@@ -963,6 +998,7 @@ function renderAudioMixer() {
       const solo = row.querySelector(".midi-channel-solo");
       const mute = row.querySelector(".midi-channel-mute");
       const updateButtons = () => {
+        row.dataset.solo = String(stem.solo); row.dataset.muted = String(stem.muted);
         solo.textContent = stem.solo ? "Desolo" : "Solo";
         mute.textContent = stem.muted ? "Unmute" : "Mute";
         const anySolo = (song.audioStems ?? []).some((item) => item.solo) || (song.audioMix ?? []).some((item) => item.solo);
@@ -971,6 +1007,18 @@ function renderAudioMixer() {
       solo.addEventListener("click", () => { stem.solo = !stem.solo; row.dataset.solo = String(stem.solo); applyStemMix(song); updateButtons(); persistAudioStemMix(song); });
       mute.addEventListener("click", () => { stem.muted = !stem.muted; row.dataset.muted = String(stem.muted); applyStemMix(song); updateButtons(); persistAudioStemMix(song); });
       row.dataset.stem = stem.id;
+      row.classList.toggle('selected-stem', selectedStemIds.has(stem.id));
+      const selectStem=document.createElement('button');selectStem.type='button';selectStem.className='stem-select';selectStem.textContent='✓';selectStem.title='Selecionar pista (Shift: intervalo)';selectStem.setAttribute('aria-label',`Selecionar pista ${stem.name}`);selectStem.setAttribute('aria-pressed',String(selectedStemIds.has(stem.id)));row.querySelector('.audio-channel-label').append(selectStem);
+      row.querySelector('.audio-channel-label').addEventListener('click', event => {
+        if (event.target.closest('input,button:not(.stem-select)')) return;
+        if (event.shiftKey && lastStemIndex !== null) {
+          const [start,end]=[Math.min(lastStemIndex,stemIndex),Math.max(lastStemIndex,stemIndex)];
+          for(let i=start;i<=end;i++)selectedStemIds.add(song.audioStems[i].id);
+        } else if (selectedStemIds.has(stem.id)) selectedStemIds.delete(stem.id); else selectedStemIds.add(stem.id);
+        lastStemIndex=stemIndex;
+        for(const item of container.querySelectorAll('[data-stem]')){const selected=selectedStemIds.has(item.dataset.stem);item.classList.toggle('selected-stem',selected);item.querySelector('.stem-select')?.setAttribute('aria-pressed',String(selected));}
+        $('#audio-remove-selected').disabled=!selectedStemIds.size;
+      });
       row.dataset.solo = String(stem.solo);
       row.dataset.muted = String(stem.muted);
       row.querySelector(".stem-remove").addEventListener("click", async () => {
@@ -986,6 +1034,19 @@ function renderAudioMixer() {
       updateButtons();
       container.append(row);
     }
+    const master = document.createElement("div");
+    master.className = "audio-channel-row audio-master-strip";
+    master.innerHTML = `<div class="audio-channel-label"><strong>MASTER</strong><span>Saída principal</span></div><label class="midi-mix-control audio-master-control"><span>Volume geral</span><output>${Math.round(masterVolume * 100)}%</output><input type="range" min="0" max="1" step="0.01" value="${masterVolume}" aria-label="Fader master de áudio" /></label>`;
+    const masterFader = master.querySelector("input");
+    masterFader.addEventListener("input", () => {
+      const value = Number(masterFader.value);
+      song.audioMasterVolume = value;
+      master.querySelector("output").value = `${Math.round(value * 100)}%`;
+      if (audioMixerMaster && pitchContext) audioMixerMaster.gain.setTargetAtTime(value, pitchContext.currentTime, 0.015);
+    });
+    masterFader.addEventListener("change", () => dbPut(song).catch(() => toast("Não foi possível guardar o volume master.")));
+    container.append(master);
+    startAudioMeters(container);
   }).catch((error) => {
     container.innerHTML = "";
     const message = document.createElement("p");
@@ -995,6 +1056,15 @@ function renderAudioMixer() {
     toast(error.message || "Não foi possível abrir o mixer de áudio.");
   });
 }
+
+$('#audio-remove-selected').addEventListener('click', async () => {
+  const song=selectedSong(); if(!song || song.id!==selectedStemSong || !selectedStemIds.size)return;
+  const ids=new Set(selectedStemIds), count=(song.audioStems??[]).filter(stem=>ids.has(stem.id)).length;
+  if(!count || !confirm(`Remover ${count} pista(s) selecionada(s) desta música? Os ficheiros originais não são apagados.`))return;
+  song.audioStems=song.audioStems.filter(stem=>!ids.has(stem.id));
+  try { await dbPut(song); selectedStemIds.clear();lastStemIndex=null;const playing=!audio.paused;await connectAudioStems(song);if(playing)startStemPlayers();renderAudioMixer();syncTrackDetails(); }
+  catch(error){toast(error.message||'Não foi possível remover as pistas.');}
+});
 
 async function setAudioTranspose(semitones) {
   if (!semitones && !pitchNode) return;
@@ -1181,7 +1251,7 @@ function renderLyricsEditorPreview() {
   preview.replaceChildren();
   const lines = textarea.value.split("\n");
   lines.forEach((line, index) => {
-    const row = document.createElement("div"); row.className = "editor-preview-line"; row.dataset.sourceIndex = String(index);
+    const row = document.createElement("div"); row.className = "editor-preview-line" + (line.trim() ? "" : " editor-preview-blank"); row.dataset.sourceIndex = String(index);
     appendColoredLyricText(row, line); if (!line) row.append(document.createTextNode("\u00a0")); preview.append(row);
   });
   preview.scrollTop = textarea.scrollTop;
@@ -1293,7 +1363,7 @@ function sendEmbeddedMidiCommand(song, command) {
   const send = (bytes, channel = null) => {
     const output = lyricMidiOutput(song, channel);
     if (!output) return false;
-    output.open().then(() => output.send(bytes)).catch(() => {});
+    output.open().then(() => { output.send(bytes); pulseMidiActivity('out'); }).catch(() => {});
     return true;
   };
   const system = command.toUpperCase();
@@ -1336,7 +1406,7 @@ function fireEmbeddedMidiActions(trigger, song = selectedSong(), position = null
   if(trigger==='time')for(const event of song.lyricEvents||[]){
     const texts=[song.lyricsText,...Object.values(song.lyricOutputLyrics||{})];
     if(!texts.some(text=>text?.includes('[stage:'+event.id+']'))||event.time>position||event.time<=embeddedMidiLastPosition)continue;
-    if(event.kind==='midi'){const bytes=eventMidiBytes(event),output=lyricMidiOutput(song,event.channel-1);if(output)output.open().then(()=>output.send(bytes)).catch(error=>toast('MIDI: '+error.message));else toast('Evento MIDI: seleciona uma saída no mixer.');}
+    if(event.kind==='midi'){const bytes=eventMidiBytes(event),output=lyricMidiOutput(song,event.channel-1);if(output)output.open().then(()=>{output.send(bytes);pulseMidiActivity('out');}).catch(error=>toast('MIDI: '+error.message));else toast('Evento MIDI: seleciona uma saída no mixer.');}
     if(event.kind==='dmx'){if(window.stageSetDesktop?.dmxCue)void window.stageSetDesktop.dmxCue(event).catch(error=>toast('DMX: '+error.message));else toast('Eventos DMX requerem a aplicação desktop com a saída ligada.');}
   }
 }
@@ -1522,10 +1592,12 @@ function renderMidiMixer() {
   const song = selectedSong();
   if (!song || !midiData) return toast("Escolhe uma faixa MIDI ou um mix com MIDI.");
   song.midiMix = normalizeMidiMix(song.midiMix);
+  midiPlayer.setMixMasterVolume(song.midiMasterVolume);
   midiPlayer.setChannelMix(song.midiMix);
   const container = $("#midi-mixer-list");
   container.innerHTML = "";
   const activeChannels = midiData.channels;
+  container.style.setProperty("--mixer-strip-count", String(activeChannels.length + 1));
   const outputs = allMidiOutputs();
   for (const channel of activeChannels) {
     const settings = song.midiMix[channel.channel];
@@ -1630,7 +1702,41 @@ function renderMidiMixer() {
     });
     container.append(row);
   }
+  const master = document.createElement("div");
+  master.className = "midi-channel-row midi-master-strip";
+  master.innerHTML = '<div class="midi-channel-label"><strong>MASTER</strong><span class="midi-channel-meta">Volume MIDI</span></div><label class="midi-mix-control midi-master-control"><span>Volume geral</span><output></output><input type="range" min="0" max="1" step="0.01" aria-label="Fader master MIDI"></label>';
+  const fader = master.querySelector("input");
+  fader.value = String(Number.isFinite(song.midiMasterVolume) ? Math.max(0, Math.min(1, song.midiMasterVolume)) : 1);
+  const output = master.querySelector("output");
+  output.value = `${Math.round(Number(fader.value) * 100)}%`;
+  fader.addEventListener("input", () => { song.midiMasterVolume = Number(fader.value); output.value = `${Math.round(song.midiMasterVolume * 100)}%`; midiPlayer.setMixMasterVolume(song.midiMasterVolume); });
+  fader.addEventListener("change", () => persistMidiMix(song));
+  container.append(master);
 }
+
+function setupMixerView(kind, defaultOverview = false) {
+  const list = $(`#${kind}-mixer-list`), toggle = $(`#${kind}-mixer-overview`), zoom = $(`#${kind}-mixer-zoom`), value = $(`#${kind}-mixer-zoom-value`);
+  const key = `stageset-${kind}-mixer-view`;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+  let overview = typeof saved.overview === 'boolean' ? saved.overview : defaultOverview;
+  zoom.value = String(Math.max(56, Math.min(160, Number(saved.width) || 88)));
+  function update() {
+    list.classList.toggle('mixer-overview', overview);
+    list.style.setProperty('--mixer-strip-width', `${zoom.value}px`);
+    toggle.setAttribute('aria-pressed', String(overview));
+    toggle.textContent = overview ? 'Visão geral ativa' : 'Visão geral';
+    zoom.disabled = overview;
+    value.textContent = overview ? 'Ajustado à janela' : `${zoom.value} px`;
+  }
+  function save() { try { localStorage.setItem(key, JSON.stringify({overview, width:Number(zoom.value)})); } catch {} }
+  toggle.addEventListener('click', () => { overview = !overview; update(); save(); });
+  zoom.addEventListener('input', update);
+  zoom.addEventListener('change', save);
+  update();
+}
+setupMixerView('midi');
+setupMixerView('audio', true);
 
 function renderMidiInputs() {
   renderMidiOutputs();
@@ -1689,6 +1795,7 @@ function attachPedalInput(input) {
 }
 
 function onPedalMessage(event, inputId) {
+  pulseMidiActivity('in');
   const [status, number, value] = event.data;
   const isSongSelect = status === 0xf3;
   const command = status & 0xf0;
@@ -3032,6 +3139,7 @@ function sendTimelineMidiEvents(song, previous, current) {
     else if (event.type === "song") output.send([0xf3, value]);
     else if (event.type === "pitch") output.send([0xe0 | channel, (value * 129) & 0x7f, (value * 129 >> 7) & 0x7f]);
     else output.send([0xb0 | channel, Math.max(0, Math.min(127, Number(event.controller ?? event.number) || 0)), value]);
+    pulseMidiActivity('out');
   }
 }
 
@@ -3686,6 +3794,7 @@ async function selectSong(id, autoplay = false, { quickie = false } = {}) {
         midiData.controllers = [...midiData.controllers, ...song.timelineControllers].sort((a, b) => a.time - b.time);
         midiPlayer.controllerCursor = 0;
       }
+      midiPlayer.setMixMasterVolume(song.midiMasterVolume);
       midiPlayer.setChannelMix(normalizeMidiMix(song.midiMix));
       for (let channel = 0; channel < 16; channel++) {
         const route = song.midiOutputIds?.[channel] ?? "inherit";
@@ -4733,6 +4842,27 @@ function advanceAfterTrack() {
 audio.volume = 0.8;
 midiPlayer.setVolume(0.8);
 
+const midiActivityTimers = {};
+function pulseMidiActivity(kind) {
+  const indicator = document.getElementById(`midi-${kind}-indicator`);
+  if (!indicator) return;
+  indicator.classList.add('active'); clearTimeout(midiActivityTimers[kind]);
+  midiActivityTimers[kind] = setTimeout(() => indicator.classList.remove('active'), 150);
+}
+midiPlayer.onMidiSent = () => pulseMidiActivity('out');
+let clickContext, clickTimer = null;
+const clickBpm = $('#click-bpm'), clickToggle = $('#click-toggle'), clickStatus = $('#click-status');
+function stopClick() { clearInterval(clickTimer); clickTimer = null; clickToggle.setAttribute('aria-pressed','false'); clickToggle.textContent='Iniciar click'; clickStatus.textContent=''; }
+function clickBeat() {
+  if (!clickContext || clickContext.state !== 'running') return;
+  const now=clickContext.currentTime, oscillator=clickContext.createOscillator(), gain=clickContext.createGain();
+  oscillator.frequency.value=1000;gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(.12,now+.004);gain.gain.exponentialRampToValueAtTime(.0001,now+.05);
+  oscillator.connect(gain).connect(clickContext.destination);oscillator.start(now);oscillator.stop(now+.055);
+}
+function scheduleClick() { clearInterval(clickTimer);const bpm=Math.max(20,Math.min(300,Number(clickBpm.value)||120));clickBpm.value=String(bpm);clickTimer=setInterval(clickBeat,60000/bpm);clickStatus.textContent=`${bpm} BPM`; }
+clickToggle.addEventListener('click',async()=>{if(clickTimer){stopClick();return;}try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)throw Error('Áudio indisponível');clickContext??=new Context();await clickContext.resume();scheduleClick();clickBeat();clickToggle.setAttribute('aria-pressed','true');clickToggle.textContent='Parar click';}catch(error){stopClick();clickStatus.textContent=error.message;}});
+clickBpm.addEventListener('change',()=>{if(clickTimer)scheduleClick();});
+
 document.addEventListener("keydown", (event) => {
   const target = event.target;
   const isTyping = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable;
@@ -4882,7 +5012,7 @@ backgroundEditor=setupBackgroundEditor({
   },report:toast,
 });
 applyBackground($('#lyrics-stage'),mainBackground());
-syncController=setupSync({getInputs:allMidiInputs,getOutputs:allMidiOutputs,connectMidi:()=>requestMidiAccess({notify:true,sysex:true}),position:currentPosition,playing:isPlaying,seek:seekPlaybackTo,play:async()=>{if(!isPlaying())$('#play').click();},pause:pausePlayback,speed:()=>selectedSong()?.tempo||1,report:toast});
+syncController=setupSync({getInputs:allMidiInputs,getOutputs:allMidiOutputs,connectMidi:()=>requestMidiAccess({notify:true,sysex:true}),position:currentPosition,playing:isPlaying,seek:seekPlaybackTo,play:async()=>{if(!isPlaying())$('#play').click();},pause:pausePlayback,speed:()=>selectedSong()?.tempo||1,report:toast,onMidiSent:()=>pulseMidiActivity('out'),onMidiReceived:()=>pulseMidiActivity('in')});
 sessionController=setupSession({
   readState:()=>{const song=selectedSong();return {song:song?{id:song.id,title:String(song.title||'').slice(0,180),fileName:String(song.fileName||'').slice(0,180)}:null,playing:isPlaying(),position:currentPosition(),rate:song?.tempo||1};},
   pause:()=>{if(queueDelayTimer)clearTimeout(queueDelayTimer);queueDelayTimer=null;pausePlayback();},stopTimecode:()=>syncController.stop(),report:toast,
@@ -4921,11 +5051,11 @@ mainLyricsScreen=createLyricsScreen({host:$('#lyrics-stage'),viewport:$('#lyrics
   setlist:()=>({title:'Setlist',items:state.setlist.map(id=>state.songs.find(song=>song.id===id)).filter(Boolean).map(song=>({id:song.id,title:song.title,current:song.id===state.currentId}))}),
   library:()=>({title:'Biblioteca',items:state.songs.map(song=>({id:song.id,title:song.title,current:song.id===state.currentId}))}),
   select:id=>selectSong(id)
-},onPaintState:painting=>{if(painting){mainLyricsScreen._resumePaint=isPlaying();if(mainLyricsScreen._resumePaint&&isPlaying())$('#play').click();}else if(mainLyricsScreen._resumePaint){mainLyricsScreen._resumePaint=false;setTimeout(()=>{if(!isPlaying())$('#play').click();},5000);}}});
+}});
 hostPublisher=setupHostSettings({container:$('.settings-modal'),outputs:()=>state.displayOutputs.map(o=>({id:o.id,name:o.name})),refresh:refreshMosaic});
 window.stageSetDesktop?.onHostRequest?.(({id,action,output,data})=>requestScreen(action,output,data,()=>window.stageSetDesktop.hostValidate(id)));
 attachEventInserter($('#lyrics-editor-text'),{root:$('.lyrics-editor-modal'),context:()=>({songId:editingLyricsSongId,output:editingLyricsOutput,position:currentPosition()}),save:(ctx,event)=>requestScreen('event-save',ctx.output,{songId:ctx.songId,event})});
-showProject=setupShowProject({snapshot:async()=>({backup:currentShowBackup(),files:await showFiles(state.songs)}),clear:clearLibraryContents,restore:restoreBackupFile,allow:requireStudio,allowOpen:()=>true,notify:toast});
+showProject=setupShowProject({snapshot:async()=>({backup:currentShowBackup(),files:await showFiles(state.songs,state.displayOutputs,mainBackground())}),clear:clearLibraryContents,restore:restoreBackupFile,allow:requireStudio,allowOpen:()=>true,notify:toast});
 initialize().then(()=>showProject.ready()).catch(e=>toast(e.message));
 let savedShowPreferences='';setInterval(()=>{if(!showProject?.active)return;const preferences=JSON.stringify([...transferSettingKeys.map(key=>localStorage.getItem(key)),state.volume,state.autoScroll,state.quickies,state.pedalMappings,state.hideSetlistDuringPlayback,state.interSongDelay,[...state.playedSongIds]]);if(preferences!==savedShowPreferences){savedShowPreferences=preferences;showProject.changed();}},1500);
 
