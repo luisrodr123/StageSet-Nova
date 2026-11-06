@@ -1,5 +1,10 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.4 — em desenvolvimento
+
+Correção da numeração: esta versão inclui as alterações e limitações documentadas na versão 0.22.3, incluindo os botões Mute e a melhoria experimental do sincronismo WAV. Os leitores WAV continuam independentes e não garantem sincronismo à amostra.
+
+
 ## Versão 0.22.3 — em desenvolvimento
 
 - Mixer de áudio: Mute independente para master, Click e saída SMPTE/LTC, preservando os níveis anteriores ao reativar. O Mute SMPTE não altera mensagens MIDI MTC.

@@ -1,4 +1,4 @@
-const CACHE='stageset-host-0.22.3';
+const CACHE='stageset-host-0.22.4';
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(['./host.html','./host.js','./host-sync.js','./host-setlist.js','./host.webmanifest','./host-icon-192.png','./host-icon-512.png','./lyrics-screen.js','./lyrics-screen.css','./lyric-ink.js','./screen-data.js','./lyrics-pdf.js','./lyric-events.js','./backgrounds.js'])).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('stageset-host-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{if(event.request.method!=='GET'||new URL(event.request.url).pathname.startsWith('/api/'))return;event.respondWith(fetch(event.request).catch(()=>caches.match(event.request)));});

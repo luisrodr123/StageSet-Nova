@@ -1,4 +1,4 @@
-# StageSet 0.22.3 — versão de teste
+# StageSet 0.22.4 — versão de teste
 
 Mute independente no master áudio, Click e SMPTE/LTC. A reprodução de pistas faz verificações no arranque e corrige deriva, mas continua sem garantia de sincronismo à amostra.
 
