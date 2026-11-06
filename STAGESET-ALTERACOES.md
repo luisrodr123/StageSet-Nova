@@ -1,5 +1,12 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.6 — em desenvolvimento
+
+Preparação experimental para até 16 WAV: validação de cabeçalhos PCM, estimativa de memória antes de descodificar e descodificação sequencial cancelável. Um teste OfflineAudioContext descodificou 16 WAV PCM curtas e alinhou os seus impulsos na mesma amostra após uma procura.
+
+Esta preparação continua fora do leitor normal; os seus controlos de memória ainda não protegem a reprodução da aplicação. O limite estimado não inclui toda a memória temporária ou do sistema. Faltam integrar e testar transporte, mixer, loop, MIDI e saídas, bem como WAV longas e hardware real; não há garantia de sincronismo em atuação.
+
+
 ## Versão 0.22.5 — em desenvolvimento
 
 Motor experimental de WAV com relógio partilhado: agenda até 32 buffers na mesma posição e instante, com pausa, procura, velocidade e interrupção conjunta em caso de falha. Num teste OfflineAudioContext, 32 impulsos foram renderizados na mesma amostra; 37 testes automáticos passaram.

@@ -1,6 +1,6 @@
 {
   "name": "stage-set",
-  "version": "0.22.5",
+  "version": "0.22.6",
   "description": "Windows setlist, lyrics and karaoke player",
   "private": true,
   "type": "module",
