@@ -1,5 +1,12 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.5 — em desenvolvimento
+
+Motor experimental de WAV com relógio partilhado: agenda até 32 buffers na mesma posição e instante, com pausa, procura, velocidade e interrupção conjunta em caso de falha. Num teste OfflineAudioContext, 32 impulsos foram renderizados na mesma amostra; 37 testes automáticos passaram.
+
+O motor ainda não está integrado na reprodução do StageSet: a aplicação continua a usar leitores independentes. O protótipo usa áudio totalmente descodificado em memória, o que pode ser demasiado para 32 ficheiros grandes. Faltam uma solução de memória adequada, integração com mixer, transportes, loop, MIDI e saídas, e ensaios com ficheiros e interface reais. Não tratar este teste offline como validação para atuação.
+
+
 ## Versão 0.22.4 — em desenvolvimento
 
 Correção da numeração: esta versão inclui as alterações e limitações documentadas na versão 0.22.3, incluindo os botões Mute e a melhoria experimental do sincronismo WAV. Os leitores WAV continuam independentes e não garantem sincronismo à amostra.
