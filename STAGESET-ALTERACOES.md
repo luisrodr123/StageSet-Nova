@@ -1,5 +1,12 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.3 — em desenvolvimento
+
+- Mixer de áudio: Mute independente para master, Click e saída SMPTE/LTC, preservando os níveis anteriores ao reativar. O Mute SMPTE não altera mensagens MIDI MTC.
+- WAV: impede o arranque parcial quando uma pista ainda não carregou os metadados, interrompe o conjunto em falha, corrige periodicamente a deriva e retoma pistas paradas ao procurar uma posição anterior. As pistas continuam em leitores independentes: não é sincronismo à amostra nem há garantia absoluta; requer ensaio com o computador, as WAV e a interface reais.
+- Validação: 32 WAV silenciosas, três ciclos e procura num ambiente isolado apresentaram desvios entre 7 e 38 ms; uma pista parada retomou depois da procura. Os Mute foram verificados na interface e na persistência; o teste geral passou na segunda tentativa, após um timeout anterior na emissão DMX simulada. O Host portátil abriu e recebeu letras no teste automático.
+
+
 ## Versão 0.22.2 — em desenvolvimento
 
 - Host Windows e Android: ecrã inicial compacto com pesquisa, seleção, endereço manual e ligação visíveis; quando existem vários computadores, a lista usa páginas em vez de obrigar a deslocar a janela.

@@ -89,6 +89,8 @@ let audioOutputDeviceId = localStorage.getItem("stageset-audio-output-device") ?
 let audioOutputDeviceName = "Saída do sistema";
 let stemPlayers = [];
 let stemTransportGeneration = 0;
+let stemSyncTimer = null;
+let lastStemSyncAt = 0;
 let queueDelayTimer = null;
 let libraryClickTimer = null;
 let pitchGraphPromise = null;
@@ -314,6 +316,7 @@ function isPlaying() {
 
 function disposeStemPlayers() {
   stemTransportGeneration++;
+  clearInterval(stemSyncTimer);stemSyncTimer=null;
   for (const player of stemPlayers) {
     player.audio.pause();
     try { player.source.disconnect(); player.gain.disconnect(); player.panner.disconnect(); player.outputSplitter.disconnect(); } catch {}
@@ -556,23 +559,32 @@ async function connectAudioStems(song) {
 
 function syncStemPosition(force = false) {
   if (!Number.isFinite(audio.currentTime)) return;
+  const now=performance.now();if(!force&&now-lastStemSyncAt<180)return;lastStemSyncAt=now;
+  const baseRate=Number.isFinite(audio.playbackRate)?audio.playbackRate:1;
   for (const player of stemPlayers) {
     player.audio.volume = audio.volume;
     if (player.audio.ended && !force) continue;
     if (!Number.isFinite(player.audio.duration)) continue;
+    if(audio.currentTime>=player.audio.duration){player.audio.pause();continue;}
     const target = Math.min(audio.currentTime, Math.max(0, player.audio.duration - 0.02));
-    if (force || Math.abs(player.audio.currentTime - target) > 0.35) {
+    const drift=target-player.audio.currentTime;
+    if (force || Math.abs(drift) > 0.12) {
       try { player.audio.currentTime = target; } catch {}
     }
+    const adjustment=!force&&Math.abs(drift)>.015&&Math.abs(drift)<=.12?Math.max(-.03,Math.min(.03,drift*.3)):0;
+    const rate=Math.max(.5,Math.min(2,baseRate*(1+adjustment)));
+    if(Math.abs(player.audio.playbackRate-rate)>.001)player.audio.playbackRate=rate;
   }
 }
 
 function startStemPlayers() {
   const song = selectedSong();
   if (!song || !stemPlayers.length) return;
+  if(stemPlayers.some(player=>player.audio.readyState<1||!Number.isFinite(player.audio.duration))){audio.pause();pauseStemPlayers();midiPlayer.pause();toast('As pistas ainda estão a carregar. Aguarda e volta a iniciar.');return;}
   const generation=++stemTransportGeneration, players=[...stemPlayers];
   syncStemPosition(true);
   const attempts=players.map(player => {
+    if(audio.currentTime>=player.audio.duration)return Promise.resolve();
     player.audio.playbackRate = song.tempo ?? 1;
     return player.audio.play();
   });
@@ -580,12 +592,13 @@ function startStemPlayers() {
     if(generation!==stemTransportGeneration||selectedSong()?.id!==song.id)return;
     const failed=results.findIndex(result=>result.status==='rejected');
     if(failed>=0){audio.pause();pauseStemPlayers();midiPlayer.pause();toast(`Não foi possível iniciar ${song.audioStems?.find(stem=>stem.id===players[failed].id)?.name??'uma pista'}; reprodução interrompida.`);return;}
-    syncStemPosition(true);
+    syncStemPosition(true);clearInterval(stemSyncTimer);stemSyncTimer=setInterval(()=>{if(!audio.paused&&!audio.ended)syncStemPosition();},200);
   });
 }
 
 function pauseStemPlayers() {
   stemTransportGeneration++;
+  clearInterval(stemSyncTimer);stemSyncTimer=null;
   stemPlayers.forEach((player) => player.audio.pause());
 }
 
@@ -690,7 +703,7 @@ function normalizeSongAudioMix(song, channelCount) {
 function applyAudioMix(song) {
   if (!song || song.id !== audioMixerSongId) return;
   const masterVolume = Math.max(0, Math.min(1, Number.isFinite(song.audioMasterVolume) ? song.audioMasterVolume : 1));
-  if (audioMixerMaster && pitchContext) audioMixerMaster.gain.setTargetAtTime(masterVolume, pitchContext.currentTime, 0.015);
+  if (audioMixerMaster && pitchContext) audioMixerMaster.gain.setTargetAtTime(song.audioMasterMuted ? 0 : masterVolume, pitchContext.currentTime, 0.015);
   const channelCount = audioMixerChannels.length;
   const settings = normalizeSongAudioMix(song, channelCount);
   const hasSolo = settings.some((channel) => channel.solo);
@@ -1044,21 +1057,24 @@ function renderAudioMixer() {
       updateButtons();
       container.append(row);
     }
-    for(const aux of [{id:'click',name:'CLICK',label:'Volume do click',value:getClickVolume(),set:setClickVolume},{id:'ltc',name:'SMPTE',label:'Volume SMPTE/LTC de saída',value:syncController?.getLtcVolume()??1,set:value=>syncController?.setLtcVolume(value)}]){
+    for(const aux of [{id:'click',name:'CLICK',label:'Volume do click',value:getClickVolume(),set:setClickVolume,muted:getClickMuted(),setMuted:setClickMuted},{id:'ltc',name:'SMPTE',label:'Volume SMPTE/LTC de saída',value:syncController?.getLtcVolume()??1,set:value=>syncController?.setLtcVolume(value),muted:syncController?.getLtcMuted()??false,setMuted:value=>syncController?.setLtcMuted(value)}]){
       const row=document.createElement('div');row.className='audio-channel-row audio-aux-strip';row.dataset.aux=aux.id;
-      row.innerHTML=`<div class="audio-channel-label"><strong>${aux.name}</strong></div><label class="midi-mix-control audio-master-control"><span>${aux.label}</span><output></output><input type="range" min="0" max="1" step="0.01" aria-label="${aux.label}"></label>`;
+      row.innerHTML=`<div class="audio-channel-label"><strong>${aux.name}</strong></div><button type="button" class="midi-channel-mute" aria-label="Mute ${aux.name}"></button><label class="midi-mix-control audio-master-control"><span>${aux.label}</span><output></output><input type="range" min="0" max="1" step="0.01" aria-label="${aux.label}"></label>`;
       const fader=row.querySelector('input'),value=row.querySelector('output');fader.value=String(aux.value);value.value=`${Math.round(aux.value*100)}%`;
+      const mute=row.querySelector('button');let muted=aux.muted;const refresh=()=>{row.dataset.muted=String(muted);mute.textContent=muted?'Unmute':'Mute';mute.setAttribute('aria-pressed',String(muted));};refresh();mute.addEventListener('click',()=>{muted=!muted;aux.setMuted(muted);refresh();});
       fader.addEventListener('input',()=>{const level=Number(fader.value);aux.set(level);value.value=`${Math.round(level*100)}%`;});container.append(row);
     }
     const master = document.createElement("div");
     master.className = "audio-channel-row audio-master-strip";
-    master.innerHTML = `<div class="audio-channel-label"><strong>MASTER</strong><span>Saída principal</span></div><label class="midi-mix-control audio-master-control"><span>Volume geral</span><output>${Math.round(masterVolume * 100)}%</output><input type="range" min="0" max="1" step="0.01" value="${masterVolume}" aria-label="Fader master de áudio" /></label>`;
+    master.innerHTML = `<div class="audio-channel-label"><strong>MASTER</strong><span>Saída principal</span></div><button type="button" class="midi-channel-mute" aria-label="Mute master de áudio"></button><label class="midi-mix-control audio-master-control"><span>Volume geral</span><output>${Math.round(masterVolume * 100)}%</output><input type="range" min="0" max="1" step="0.01" value="${masterVolume}" aria-label="Fader master de áudio" /></label>`;
+    const masterMute=master.querySelector('button');const updateMasterMute=()=>{master.dataset.muted=String(!!song.audioMasterMuted);masterMute.textContent=song.audioMasterMuted?'Unmute':'Mute';masterMute.setAttribute('aria-pressed',String(!!song.audioMasterMuted));};updateMasterMute();
+    masterMute.addEventListener('click',()=>{song.audioMasterMuted=!song.audioMasterMuted;updateMasterMute();applyAudioMix(song);void dbPut(song).catch(()=>toast('Não foi possível guardar o Mute master.'));});
     const masterFader = master.querySelector("input");
     masterFader.addEventListener("input", () => {
       const value = Number(masterFader.value);
       song.audioMasterVolume = value;
       master.querySelector("output").value = `${Math.round(value * 100)}%`;
-      if (audioMixerMaster && pitchContext) audioMixerMaster.gain.setTargetAtTime(value, pitchContext.currentTime, 0.015);
+      if (audioMixerMaster && pitchContext) audioMixerMaster.gain.setTargetAtTime(song.audioMasterMuted ? 0 : value, pitchContext.currentTime, 0.015);
     });
     masterFader.addEventListener("change", () => dbPut(song).catch(() => toast("Não foi possível guardar o volume master.")));
     container.append(master);
@@ -4827,7 +4843,12 @@ audio.addEventListener("pause", () => { if (!audio.ended) pauseStemPlayers(); up
 audio.addEventListener("pause", () => { if (stemPlayers.every((player) => player.audio.paused || player.audio.ended)) pitchContext?.suspend().catch(() => {}); });
 audio.addEventListener("seeking", () => pitchNode?.port.postMessage({ type: "reset" }));
 audio.addEventListener("seeking", () => seekStemPlayers(audio.currentTime));
-audio.addEventListener("seeked", () => { syncStemPosition(true); updatePlayback(); refreshCdgFrame(); });
+audio.addEventListener("seeked", () => {
+  syncStemPosition(true);
+  // A shorter stem may have stopped before a backward seek. Rejoin it to the transport.
+  if (!audio.paused && !audio.ended && stemPlayers.some((player) => player.audio.paused && Number.isFinite(player.audio.duration) && audio.currentTime < player.audio.duration)) startStemPlayers();
+  updatePlayback(); refreshCdgFrame();
+});
 audio.addEventListener("ended", () => {
   if (loopAtEnd(selectedSong(), currentPosition(), true)) return;
   if (stemPlayers.some((player) => !player.audio.ended && !player.audio.paused)) return updatePlayback();
@@ -4879,7 +4900,9 @@ midiPlayer.onMidiSent = () => pulseMidiActivity('out');
 let clickContext, clickGain, clickTimer = null;
 const clickBpm = $('#click-bpm'), clickToggle = $('#click-toggle'), clickStatus = $('#click-status');
 function getClickVolume(){const value=Number(localStorage.getItem('stageset-click-volume')??1);return Number.isFinite(value)?Math.max(0,Math.min(1,value)):1;}
-function setClickVolume(value){const level=Math.max(0,Math.min(1,Number(value)||0));localStorage.setItem('stageset-click-volume',String(level));if(clickGain&&clickContext)clickGain.gain.setTargetAtTime(level,clickContext.currentTime,.01);}
+function getClickMuted(){return localStorage.getItem('stageset-click-muted')==='true';}
+function setClickMuted(value){localStorage.setItem('stageset-click-muted',String(!!value));if(clickGain&&clickContext)clickGain.gain.setTargetAtTime(value?0:getClickVolume(),clickContext.currentTime,.01);}
+function setClickVolume(value){const level=Math.max(0,Math.min(1,Number(value)||0));localStorage.setItem('stageset-click-volume',String(level));if(clickGain&&clickContext)clickGain.gain.setTargetAtTime(getClickMuted()?0:level,clickContext.currentTime,.01);}
 function stopClick() { clearInterval(clickTimer); clickTimer = null; clickToggle.setAttribute('aria-pressed','false'); clickToggle.textContent='Iniciar click'; clickStatus.textContent=''; }
 function clickBeat() {
   if (!clickContext || clickContext.state !== 'running') return;
@@ -4888,7 +4911,7 @@ function clickBeat() {
   oscillator.connect(gain).connect(clickGain);oscillator.start(now);oscillator.stop(now+.055);
 }
 function scheduleClick() { clearInterval(clickTimer);const bpm=Math.max(20,Math.min(300,Number(clickBpm.value)||120));clickBpm.value=String(bpm);clickTimer=setInterval(clickBeat,60000/bpm);clickStatus.textContent=`${bpm} BPM`; }
-clickToggle.addEventListener('click',async()=>{if(clickTimer){stopClick();return;}try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)throw Error('Áudio indisponível');if(!clickContext){clickContext=new Context();clickGain=clickContext.createGain();clickGain.gain.value=getClickVolume();clickGain.connect(clickContext.destination);}await clickContext.resume();scheduleClick();clickBeat();clickToggle.setAttribute('aria-pressed','true');clickToggle.textContent='Parar click';}catch(error){stopClick();clickStatus.textContent=error.message;}});
+clickToggle.addEventListener('click',async()=>{if(clickTimer){stopClick();return;}try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)throw Error('Áudio indisponível');if(!clickContext){clickContext=new Context();clickGain=clickContext.createGain();clickGain.gain.value=getClickMuted()?0:getClickVolume();clickGain.connect(clickContext.destination);}await clickContext.resume();scheduleClick();clickBeat();clickToggle.setAttribute('aria-pressed','true');clickToggle.textContent='Parar click';}catch(error){stopClick();clickStatus.textContent=error.message;}});
 clickBpm.addEventListener('change',()=>{if(clickTimer)scheduleClick();});
 
 document.addEventListener("keydown", (event) => {

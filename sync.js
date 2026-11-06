@@ -5,6 +5,8 @@ export function setupSync({getInputs,getOutputs,connectMidi,position,playing,see
   let mode='off',timer=null,context=null,node=null,outputGain=null,stream=null,source=null,input=null,decoder=new MtcDecoder();
   let ltcVolume=Math.max(0,Math.min(1,Number(localStorage.getItem('stageset-ltc-volume')??1)));
   if(!Number.isFinite(ltcVolume))ltcVolume=1;
+  let ltcMuted=localStorage.getItem('stageset-ltc-muted')==='true';
+  const applyLtcGain=()=>{if(outputGain&&context)outputGain.gain.setTargetAtTime(ltcMuted?0:ltcVolume,context.currentTime,.01);};
   let next=0,part=0,frozen=null,wasPlaying=false,lastPosition=-1,lastClock=0,lastReceive=0,lastSeek=0,busy=false;
   const selectedRate=()=>Number($('sync-rate').value), offset=()=>Number($('sync-offset').value)||0;
   const status=text=>{$('sync-status').textContent=text;};
@@ -55,7 +57,7 @@ export function setupSync({getInputs,getOutputs,connectMidi,position,playing,see
         const read=mode==='ltc-read';
         if(!read){const device=$('sync-audio-out').value;if(device!=='default'){if(!context.setSinkId)throw new Error('Este browser não permite escolher a saída LTC. Usa o desktop.');await context.setSinkId(device);}}
         node=new AudioWorkletNode(context,'stageset-ltc',{numberOfInputs:read?1:0,numberOfOutputs:1,outputChannelCount:[1],processorOptions:{rate,mode:read?'read':'write'}});
-        if(read)node.connect(context.destination);else{outputGain=context.createGain();outputGain.gain.value=ltcVolume;node.connect(outputGain).connect(context.destination);}
+        if(read)node.connect(context.destination);else{outputGain=context.createGain();outputGain.gain.value=ltcMuted?0:ltcVolume;node.connect(outputGain).connect(context.destination);}
         if(read){
           const device=$('sync-audio-in').value;
           stream=await navigator.mediaDevices.getUserMedia({audio:{...(device!=='default'?{deviceId:{exact:device}}:{}),channelCount:1,echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
@@ -98,5 +100,5 @@ export function setupSync({getInputs,getOutputs,connectMidi,position,playing,see
   $('sync-start').onclick=()=>void start();$('sync-stop').onclick=()=>void stop();
   $('sync-mode').onchange=()=>{for(const el of document.querySelectorAll('[data-sync-mode]'))el.hidden=!el.dataset.syncMode.split(' ').includes($('sync-mode').value);};$('sync-mode').onchange();
   refreshPorts();void refreshAudio().catch(()=>{});
-  return { refreshPorts, receiveMidi:(event,id)=>{if(input?.id===id&&!input.addEventListener)onMidi(event);}, stop, getLtcVolume:()=>ltcVolume, setLtcVolume:value=>{ltcVolume=Math.max(0,Math.min(1,Number(value)||0));if(outputGain&&context)outputGain.gain.setTargetAtTime(ltcVolume,context.currentTime,.01);localStorage.setItem('stageset-ltc-volume',String(ltcVolume));} };
+  return { refreshPorts, receiveMidi:(event,id)=>{if(input?.id===id&&!input.addEventListener)onMidi(event);}, stop, getLtcVolume:()=>ltcVolume, getLtcMuted:()=>ltcMuted, setLtcVolume:value=>{ltcVolume=Math.max(0,Math.min(1,Number(value)||0));applyLtcGain();localStorage.setItem('stageset-ltc-volume',String(ltcVolume));}, setLtcMuted:value=>{ltcMuted=Boolean(value);applyLtcGain();localStorage.setItem('stageset-ltc-muted',String(ltcMuted));} };
 }

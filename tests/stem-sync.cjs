@@ -26,8 +26,14 @@ async function run(){
     if(spread>.2)throw Error(`Desvio entre WAV: ${spread.toFixed(3)} s no ciclo ${cycle+1}`);
     await js(`document.getElementById('play').click()`);
     await wait(()=>js(`return [...tracks].every(a=>a.paused)`),'Pausa incompleta');
+    if(cycle===0){await js(`const progress=document.getElementById('progress');progress.value='400';progress.dispatchEvent(new Event('input',{bubbles:true}));`);await wait(()=>js(`return [...tracks].every(a=>Math.abs(a.currentTime-4)<.3)`),'Procura não alinhou as pistas');}
     console.log(`32 WAV · ciclo ${cycle+1}: desvio ${Math.round(spread*1000)} ms`);
   }
+  await js(`document.getElementById('play').click()`);
+  await wait(()=>js(`return [...tracks].every(a=>!a.paused)`),'Reprodução indisponível');
+  await js(`window.stoppedStem=[...tracks].find(a=>a!==document.getElementById('audio'));if(!stoppedStem)throw Error('Pista adicional não encontrada');stoppedStem.pause();const progress=document.getElementById('progress');progress.value='100';progress.dispatchEvent(new Event('input',{bubbles:true}));`);
+  await wait(()=>js(`return !stoppedStem.paused`),'A pista parada não retomou após a procura');
+  console.log('Procura durante reprodução: pista parada retomou');
 }
 run().then(()=>finish(0)).catch(error=>{console.error(error);finish(1);});
 function finish(code){if(win&&!win.isDestroyed())win.destroy();if(server)server.close();app.exit(code);}

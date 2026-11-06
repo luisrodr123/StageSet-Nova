@@ -1,10 +1,12 @@
-# StageSet 0.22.2 — versão de teste
+# StageSet 0.22.3 — versão de teste
+
+Mute independente no master áudio, Click e SMPTE/LTC. A reprodução de pistas faz verificações no arranque e corrige deriva, mas continua sem garantia de sincronismo à amostra.
 
 O ecrã inicial do Host Windows e Android foi compactado para apresentar pesquisa, seleção e endereço manual no mesmo ecrã; listas longas têm paginação.
 
 O Host Windows e Android pode procurar computadores StageSet na rede, conservando a opção manual. Inclui faders independentes de click e SMPTE/LTC e marcadores de loop A/B alternáveis.
 
-**Limitação importante:** as pistas WAV ainda usam leitores independentes. Um teste isolado com 32 WAV silenciosas observou desvios entre 0 e 16 ms, mas isto não garante sincronismo à amostra ou ausência de falhas noutras máquinas. Não confiar neste mecanismo para uma atuação sem ensaios e validação em equipamento real.
+**Limitação importante:** as pistas WAV ainda usam leitores independentes. Um teste isolado com 32 WAV silenciosas, pausa/retoma e procura observou desvios entre 7 e 38 ms, mas isto não garante sincronismo à amostra ou ausência de falhas noutras máquinas. Não confiar neste mecanismo para uma atuação sem ensaios e validação em equipamento real.
 
 Inclui visão geral e zoom nos mixers e mosaico, master MIDI/áudio, click BPM, indicadores e medidores, seleção múltipla de pistas, melhorias do show e do Host e correções no editor de letras. Ver o ficheiro STAGESET-ALTERACOES.md para o detalhe e as limitações.
 
