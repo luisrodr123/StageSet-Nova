@@ -43,6 +43,11 @@ try{
  const home=await cdp(target.webSocketDebuggerUrl);
  await until(()=>evaluate(home,"!!document.getElementById('address')&&!!window.stageSetReceiver"),'address form and preload');
  await until(()=>evaluate(home,`document.getElementById('version').textContent===${JSON.stringify('v'+version)}`),'visible version');
+ await until(()=>evaluate(home,"!document.getElementById('scan').disabled"),'network scan');
+ await home.send('Emulation.setDeviceMetricsOverride',{width:380,height:340,deviceScaleFactor:1,mobile:false});
+ const layout=await evaluate(home,`foundServers=Array.from({length:11},(_,i)=>({name:'Stage '+i,url:'http://192.168.1.'+(i+1)+':4180'}));page=0;renderServers();const first=servers.firstElementChild.textContent;document.getElementById('next-page').click();const second=servers.firstElementChild.textContent;const nodes=['scan','address','auto','button','pages'].map(id=>document.getElementById(id).getBoundingClientRect());({first,second,visible:nodes.every(r=>r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth),overflow:document.body.scrollHeight>innerHeight})`);
+ assert.equal(layout.visible,true,'Host controls must fit in the window');assert.equal(layout.overflow,false,'Host page must not scroll');assert.notEqual(layout.first,layout.second,'Host pages must show different servers');
+ await evaluate(home,"foundServers=[];page=0;renderServers()");await home.send('Emulation.clearDeviceMetricsOverride');
  const infoBrowser=await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();browser=await cdp(infoBrowser.webSocketDebuggerUrl);
  const {processInfo}=await browser.send('SystemInfo.getProcessInfo');
  const browserPid=processInfo.find(p=>p.type==='browser').id;

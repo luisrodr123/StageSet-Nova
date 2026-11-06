@@ -1,4 +1,6 @@
-# StageSet 0.22.1 — versão de teste
+# StageSet 0.22.2 — versão de teste
+
+O ecrã inicial do Host Windows e Android foi compactado para apresentar pesquisa, seleção e endereço manual no mesmo ecrã; listas longas têm paginação.
 
 O Host Windows e Android pode procurar computadores StageSet na rede, conservando a opção manual. Inclui faders independentes de click e SMPTE/LTC e marcadores de loop A/B alternáveis.
 

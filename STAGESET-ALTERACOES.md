@@ -1,5 +1,12 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.2 — em desenvolvimento
+
+- Host Windows e Android: ecrã inicial compacto com pesquisa, seleção, endereço manual e ligação visíveis; quando existem vários computadores, a lista usa páginas em vez de obrigar a deslocar a janela.
+- Validação: o executável portátil Windows foi testado com janela reduzida e onze resultados, incluindo paginação e ligação; o Android compilou, mas não havia tablet ligado para confirmação visual.
+- A limitação de sincronismo das 32 WAV indicada na versão 0.22.1 continua por resolver.
+
+
 ## Versão 0.22.1 — em desenvolvimento
 
 - Host Windows e Android: procura de computadores StageSet na rede local, com ligação por seleção e endereço manual como alternativa. A descoberta depende da rede e da firewall; o acesso continua a exigir autorização do StageSet. O Host web em iPad mantém ligação por endereço.
