@@ -13,6 +13,8 @@ import { createLyricsScreen } from './lyrics-screen.js';
 import { screenPreferences, validateDrawing } from './screen-data.js';
 import {validateEvent,eventMidiBytes,eventMarkup,hydrateEvents,attachEventInserter,withEventRows} from './lyric-events.js';
 import {setupHostSettings} from './host-settings.js';
+import { SharedWavTransport } from './shared-wav-transport.js';
+import { decodeWavTracks } from './wav-preflight.js';
 let mainLyricsScreen;
 
 if ("serviceWorker" in navigator && (location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
@@ -88,6 +90,12 @@ let audioOutputChannelCount = 2;
 let audioOutputDeviceId = localStorage.getItem("stageset-audio-output-device") ?? "";
 let audioOutputDeviceName = "Saída do sistema";
 let stemPlayers = [];
+let sharedWavTransport = null;
+let sharedWavInput = null;
+let sharedWavAbort = null;
+let sharedWavRequired = false;
+let sharedWavError = '';
+let sharedWavPreparing = false;
 let stemTransportGeneration = 0;
 let stemSyncTimer = null;
 let lastStemSyncAt = 0;
@@ -279,6 +287,7 @@ function currentDuration() {
   const song = selectedSong();
   if (isDocumentSong(song)) return 0;
   if (isMidiSong(song)) return midiData?.duration ?? 0;
+  if (sharedWavTransport) return Math.max(sharedWavTransport.duration, hasMidiLayer(song) ? midiData?.duration ?? 0 : 0);
   const audioDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
   const stemDuration = stemPlayers.reduce((duration, player) => Math.max(duration, Number.isFinite(player.audio.duration) ? player.audio.duration : 0), 0);
   return Math.max(audioDuration, stemDuration, hasMidiLayer(song) ? midiData?.duration ?? 0 : 0);
@@ -288,6 +297,7 @@ function currentPosition() {
   const song = selectedSong();
   if (isDocumentSong(song)) return 0;
   if (isMidiSong(song)) return midiPlayer.currentTime;
+  if (sharedWavTransport) return sharedWavTransport.position;
   if (audio.ended) {
     const runningStem = stemPlayers.find((player) => !player.audio.ended && !player.audio.paused);
     if (runningStem) return runningStem.audio.currentTime;
@@ -311,10 +321,15 @@ function seekPlaybackTo(time) {
 function isPlaying() {
   const song = selectedSong();
   if (isDocumentSong(song)) return false;
-  return isMidiSong(song) ? midiPlayer.playing : !audio.paused || stemPlayers.some((player) => !player.audio.paused && !player.audio.ended) || (hasMidiLayer(song) && midiPlayer.playing);
+  return isMidiSong(song) ? midiPlayer.playing : !audio.paused || Boolean(sharedWavTransport?.playing) || stemPlayers.some((player) => !player.audio.paused && !player.audio.ended) || (hasMidiLayer(song) && midiPlayer.playing);
 }
 
 function disposeStemPlayers() {
+  sharedWavAbort?.abort(); sharedWavAbort = null;
+  sharedWavTransport?.stop(); sharedWavTransport = null;
+  sharedWavInput?.disconnect(); sharedWavInput = null;
+  sharedWavRequired = false; sharedWavError = ''; sharedWavPreparing = false;
+  if (pitchSource && audioMixerSplitter) { try { pitchSource.disconnect(); pitchSource.connect(audioMixerSplitter); } catch {} }
   stemTransportGeneration++;
   clearInterval(stemSyncTimer);stemSyncTimer=null;
   for (const player of stemPlayers) {
@@ -334,7 +349,7 @@ function applyStemMix(song = selectedSong()) {
     const stem = settings.find((item) => item.id === player.id);
     if (!stem) return;
     const audible = !stem.muted && ((!hasSolo && !hasChannelSolo) || stem.solo);
-    player.gain.gain.setTargetAtTime(audible ? Math.max(0, Math.min(1, stem.volume ?? 1)) : 0, pitchContext.currentTime, 0.015);
+    player.gain.gain.setTargetAtTime(audible ? Math.max(0, Math.min(1, stem.volume ?? 1)) * (sharedWavRequired ? audio.volume : 1) : 0, pitchContext.currentTime, 0.015);
     player.panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, stem.pan ?? 0)), pitchContext.currentTime, 0.015);
     routeStemOutput(player, stem.outputPair ?? 0);
   });
@@ -554,10 +569,40 @@ async function connectAudioStems(song) {
     });
     element.addEventListener("loadedmetadata", updatePlayback, { once: true });
   }
+  const stems = song.audioStems ?? [];
+  const eligible = stems.length > 0 && stems.length <= 15 && /\.wav$/i.test(song.fileName || '') && stems.every(stem => /\.wav$/i.test(stem.fileName || '') && stem.blob instanceof Blob);
+  if (eligible) {
+    sharedWavRequired = true; sharedWavPreparing = true;
+    const controller = new AbortController(); sharedWavAbort = controller;
+    // Disconnect the media element before decoding: an incomplete set must never play partially.
+    pitchSource.disconnect();
+    try {
+      if ((song.tempo ?? 1) !== 1) throw new Error('Para sincronizar WAV, repõe primeiro o andamento em 100%.');
+      const buffers = await decodeWavTracks(pitchContext, [getPlayableAudioBlob(song), ...stems.map(stem => stem.blob)], { signal: controller.signal });
+      if (controller.signal.aborted || sharedWavAbort !== controller || selectedSong()?.id !== song.id) return;
+      if (buffers.some(buffer => Math.abs(buffer.duration - buffers[0].duration) > 0.01)) throw new Error('As WAV sincronizadas têm de ter a mesma duração.');
+      sharedWavInput = pitchContext.createGain(); sharedWavInput.gain.value = audio.volume; sharedWavInput.connect(audioMixerSplitter);
+      sharedWavTransport = new SharedWavTransport(pitchContext, [{ buffer: buffers[0], destination: sharedWavInput }, ...buffers.slice(1).map((buffer, index) => ({ buffer, destination: stemPlayers[index].gain }))], { leadTime: 0.05 });
+      sharedWavTransport.seek(audio.currentTime || 0);
+      sharedWavTransport.onended = () => {
+        if (selectedSong()?.id !== song.id) return;
+        if (loopAtEnd(song, sharedWavTransport.position, true)) return;
+        if (!hasMidiLayer(song) || !midiPlayer.playing) advanceAfterTrack(); else updatePlayback();
+      };
+      sharedWavError = '';
+    } catch (error) {
+      if (controller.signal.aborted || sharedWavAbort !== controller) return;
+      sharedWavError = error.message || 'Não foi possível preparar as WAV sincronizadas.';
+      toast(sharedWavError);
+    } finally {
+      if (sharedWavAbort === controller) { sharedWavPreparing = false; applyStemMix(song); }
+    }
+  }
   applyStemMix(song);
 }
 
 function syncStemPosition(force = false) {
+  if (sharedWavRequired) return;
   if (!Number.isFinite(audio.currentTime)) return;
   const now=performance.now();if(!force&&now-lastStemSyncAt<180)return;lastStemSyncAt=now;
   const baseRate=Number.isFinite(audio.playbackRate)?audio.playbackRate:1;
@@ -580,6 +625,14 @@ function syncStemPosition(force = false) {
 function startStemPlayers() {
   const song = selectedSong();
   if (!song || !stemPlayers.length) return;
+  if (sharedWavRequired) {
+    if (!sharedWavTransport) { audio.pause(); midiPlayer.pause(); toast(sharedWavPreparing ? 'As WAV sincronizadas ainda estão a carregar.' : sharedWavError || 'Não foi possível preparar as WAV.'); return; }
+    try {
+      sharedWavTransport.play();
+      clearInterval(stemSyncTimer); stemSyncTimer = setInterval(updatePlayback, 100);
+    } catch (error) { audio.pause(); midiPlayer.pause(); toast(error.message || 'Não foi possível iniciar as WAV sincronizadas.'); }
+    return;
+  }
   if(stemPlayers.some(player=>player.audio.readyState<1||!Number.isFinite(player.audio.duration))){audio.pause();pauseStemPlayers();midiPlayer.pause();toast('As pistas ainda estão a carregar. Aguarda e volta a iniciar.');return;}
   const generation=++stemTransportGeneration, players=[...stemPlayers];
   syncStemPosition(true);
@@ -597,12 +650,17 @@ function startStemPlayers() {
 }
 
 function pauseStemPlayers() {
+  sharedWavTransport?.pause();
   stemTransportGeneration++;
   clearInterval(stemSyncTimer);stemSyncTimer=null;
   stemPlayers.forEach((player) => player.audio.pause());
 }
 
 function seekStemPlayers(position) {
+  if (sharedWavRequired) {
+    if (sharedWavTransport && Math.abs(sharedWavTransport.position - position) > 0.001) sharedWavTransport.seek(position);
+    return;
+  }
   for (const player of stemPlayers) {
     if (!Number.isFinite(player.audio.duration)) continue;
     try { player.audio.currentTime = Math.max(0, Math.min(position, Math.max(0, player.audio.duration - 0.02))); } catch {}
@@ -767,7 +825,9 @@ async function ensureAudioMixerGraph(song = selectedSong(), force = false) {
     audioMixerMerger = pitchContext.createChannelMerger(audioOutputChannelCount);
     audioMixerMerger.connect(audioMixerMaster);
     audioMixerMaster.channelCount = audioOutputChannelCount;
-    pitchSource.connect(audioMixerSplitter);
+    if (sharedWavRequired) {
+      if (sharedWavInput) { sharedWavInput.disconnect(); sharedWavInput.connect(audioMixerSplitter); }
+    } else pitchSource.connect(audioMixerSplitter);
     for (let channel = 0; channel < channelCount; channel++) {
       const gain = pitchContext.createGain();
       const leftPan = pitchContext.createGain();
@@ -910,6 +970,8 @@ function renderAudioMixer() {
       : channelCount > 2
         ? `Este áudio contém ${channelCount} canais mono separados. Ajusta cada canal durante a reprodução.`
         : channelCount === 1 ? "Controla o volume e a panorâmica deste canal mono." : "Controla separadamente os canais mono esquerdo e direito deste ficheiro de áudio.";
+    if (sharedWavRequired) $("#audio-mixer-description").textContent += sharedWavTransport ? ' · WAV: relógio partilhado (até 16 pistas, andamento 100%).' : ` · WAV: ${sharedWavPreparing ? 'a preparar' : sharedWavError || 'indisponível'}.`;
+    else if (song.audioStems?.length) $("#audio-mixer-description").textContent += ' · Pistas em leitores independentes; o relógio partilhado requer até 16 ficheiros WAV PCM.';
     for (let channel = 0; channel < controlCount; channel++) {
       const setting = settings[channel];
       const channelNumber = String(channel + 1).padStart(2, "0");
@@ -1045,6 +1107,7 @@ function renderAudioMixer() {
       row.dataset.solo = String(stem.solo);
       row.dataset.muted = String(stem.muted);
       row.querySelector(".stem-remove").addEventListener("click", async () => {
+        if (isPlaying()) return toast('Pausa a música antes de remover pistas.');
         if (!window.confirm(`Remover a pista “${stem.name}” desta música?`)) return;
         song.audioStems = song.audioStems.filter((item) => item.id !== stem.id);
         await dbPut(song);
@@ -1095,6 +1158,7 @@ for(const id of ['click','ltc']){const checkbox=$(`#show-${id}-strip`),key=`stag
 
 $('#audio-remove-selected').addEventListener('click', async () => {
   const song=selectedSong(); if(!song || song.id!==selectedStemSong || !selectedStemIds.size)return;
+  if(isPlaying())return toast('Pausa a música antes de remover pistas.');
   const ids=new Set(selectedStemIds), count=(song.audioStems??[]).filter(stem=>ids.has(stem.id)).length;
   if(!count || !confirm(`Remover ${count} pista(s) selecionada(s) desta música? Os ficheiros originais não são apagados.`))return;
   song.audioStems=song.audioStems.filter(stem=>!ids.has(stem.id));
@@ -3879,6 +3943,7 @@ async function selectSong(id, autoplay = false, { quickie = false } = {}) {
   $("#remaining").textContent = `-${formatTime(song.duration)}`;
   if (autoplay) {
     if (isDocumentSong(song)) return;
+    if (sharedWavRequired && !sharedWavTransport) { toast(sharedWavError || 'As WAV sincronizadas ainda estão a carregar.'); return; }
     if (isMidiSong(song) && midiData) await midiPlayer.play().catch((error) => toast(error.message || "Não foi possível reproduzir o MIDI."));
     else if (hasMidiLayer(song) && midiData) {
       const results = await Promise.allSettled([audio.play(), midiPlayer.play()]);
@@ -4079,6 +4144,7 @@ async function addAudioStems(files, targetSong = selectedSong()) {
   if (!requireStudio()) return;
   const song = targetSong;
   if (!song || isMidiSong(song) || isDocumentSong(song)) return toast("Seleciona primeiro uma música com áudio.");
+  if (song.id === selectedSong()?.id && isPlaying()) return toast('Pausa a música antes de adicionar pistas.');
   const selectedFiles = [];
   for (const file of [...files]) {
     if (/\.zip$/i.test(file.name)) {
@@ -4360,6 +4426,7 @@ $("#play").addEventListener("click", async () => {
   queueDelayTimer = null;
   if (!selectedSong()) return playQueueStep(1);
   if (isDocumentSong(selectedSong())) return toast("Este item é um documento, não uma faixa de áudio.");
+  if (!isPlaying() && sharedWavRequired && !sharedWavTransport) return toast(sharedWavPreparing ? 'As WAV sincronizadas ainda estão a carregar.' : sharedWavError || 'Não foi possível preparar as WAV.');
   const wasPlaying = isPlaying();
   if (isMidiSong(selectedSong())) {
     if (midiPlayer.playing) midiPlayer.pause();
@@ -4419,6 +4486,7 @@ $("#volume").addEventListener("input", (event) => {
   const volume = Number(event.target.value);
   audio.volume = volume;
   stemPlayers.forEach((player) => { player.audio.volume = volume; });
+  if (sharedWavInput) { sharedWavInput.gain.value = volume; applyStemMix(); }
   midiPlayer.setVolume(volume);
 });
 $("#studio-mode-toggle").addEventListener("click", () => {
@@ -4717,11 +4785,13 @@ async function adjustTempo(delta) {
   if (!requireStudio()) return;
   const song = selectedSong();
   if (!song || isDocumentSong(song)) return;
+  if (sharedWavTransport) return toast('O andamento das WAV sincronizadas tem de permanecer em 100%.');
   song.tempo = Math.round(Math.max(0.5, Math.min(1.5, (song.tempo ?? 1) + delta)) * 100) / 100;
   await dbPut(song);
   if (!isMidiSong(song)) audio.playbackRate = song.tempo;
   stemPlayers.forEach((player) => { player.audio.playbackRate = song.tempo; });
   if (midiData) await midiPlayer.setRate(song.tempo);
+  if (sharedWavRequired && song.tempo === 1) await connectAudioStems(song);
   $("#tempo-value").textContent = `${Math.round(song.tempo * 100)}%`;
   updatePlayback();
 }
@@ -4836,20 +4906,27 @@ audio.addEventListener("loadedmetadata", () => {
     renderLibrary();
   }
 });
-audio.addEventListener("play", () => { startStemPlayers(); updatePlayback(); });
+audio.addEventListener("play", () => { if (!audio.paused) startStemPlayers(); updatePlayback(); });
 audio.addEventListener("play", refreshCdgFrame);
-audio.addEventListener("play", () => pitchContext?.resume().catch(() => {}));
-audio.addEventListener("pause", () => { if (!audio.ended) pauseStemPlayers(); updatePlayback(); });
-audio.addEventListener("pause", () => { if (stemPlayers.every((player) => player.audio.paused || player.audio.ended)) pitchContext?.suspend().catch(() => {}); });
+audio.addEventListener("play", () => {
+  if (audio.paused || !pitchContext) return;
+  const songId = selectedSong()?.id;
+  pitchContext.resume().catch(() => {
+    if (sharedWavRequired && selectedSong()?.id === songId && !audio.paused) { audio.pause(); pauseStemPlayers(); midiPlayer.pause(); toast('Não foi possível ativar a saída de áudio sincronizada.'); }
+  });
+});
+audio.addEventListener("pause", () => { if (audio.paused && !audio.ended) pauseStemPlayers(); updatePlayback(); });
+audio.addEventListener("pause", () => { if (audio.paused && !sharedWavRequired && stemPlayers.every((player) => player.audio.paused || player.audio.ended)) pitchContext?.suspend().catch(() => {}); });
 audio.addEventListener("seeking", () => pitchNode?.port.postMessage({ type: "reset" }));
 audio.addEventListener("seeking", () => seekStemPlayers(audio.currentTime));
 audio.addEventListener("seeked", () => {
   syncStemPosition(true);
   // A shorter stem may have stopped before a backward seek. Rejoin it to the transport.
-  if (!audio.paused && !audio.ended && stemPlayers.some((player) => player.audio.paused && Number.isFinite(player.audio.duration) && audio.currentTime < player.audio.duration)) startStemPlayers();
+  if (!sharedWavRequired && !audio.paused && !audio.ended && stemPlayers.some((player) => player.audio.paused && Number.isFinite(player.audio.duration) && audio.currentTime < player.audio.duration)) startStemPlayers();
   updatePlayback(); refreshCdgFrame();
 });
 audio.addEventListener("ended", () => {
+  if (sharedWavRequired) return;
   if (loopAtEnd(selectedSong(), currentPosition(), true)) return;
   if (stemPlayers.some((player) => !player.audio.ended && !player.audio.paused)) return updatePlayback();
   if (!hasMidiLayer(selectedSong()) || !midiData) advanceAfterTrack();
@@ -5075,6 +5152,7 @@ sessionController=setupSession({
     if(!song||isDocumentSong(song))throw Error('Música ausente ou ambígua: '+value.song.title);
     if(state.currentId!==song.id){pausePlayback();await selectSong(song.id);}
     if(!valid())return;
+    if(sharedWavRequired && value.rate!==1)throw Error('As WAV sincronizadas exigem andamento de 100%.');
     if(song.tempo!==value.rate){song.tempo=value.rate;audio.playbackRate=value.rate;stemPlayers.forEach(p=>p.audio.playbackRate=value.rate);if(midiData)await midiPlayer.setRate(value.rate);$('#tempo-value').textContent=Math.round(value.rate*100)+'%';}
     if(!valid())return;
     if(Math.abs(currentPosition()-value.position)>.2||!value.playing)seekPlaybackTo(value.position);

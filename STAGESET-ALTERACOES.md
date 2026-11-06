@@ -1,5 +1,14 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.7 — em desenvolvimento
+
+Integração de teste: músicas com 2 a 16 WAV PCM (incluindo a principal), com a mesma duração e andamento a 100%, são preparadas e agendadas no mesmo relógio Web Audio. O mixer indica quando o relógio partilhado está ativo. Quando a preparação falha ou a estimativa de áudio descodificado ultrapassa 512 MiB, o conjunto não arranca parcialmente. Pausar, retomar e procurar reagendam as pistas em conjunto; adicionar ou remover pistas exige pausa.
+
+O limite de 512 MiB é apenas uma estimativa dos buffers descodificados e não inclui a memória temporária, gráfica e restante aplicação. WAV longas podem excedê-lo; ficheiros não PCM, durações diferentes ou andamentos diferentes de 100% não entram neste modo. Conjuntos com mais de 16 ficheiros ou outros formatos continuam a usar leitores independentes. MIDI, rede, hardware de áudio e o loop não foram validados como sincronismo à amostra. É uma versão para testes, sem garantia de atuação.
+
+Validação: 39 testes automáticos; teste Electron da aplicação com 16 WAV curtas, três pausas/retomas, procura durante reprodução, mixer e retoma rápida; teste offline de 16 WAV descodificadas com impulsos na mesma amostra; teste geral Electron e teste anterior de 32 WAV. Nenhum teste com a interface real ou 16 WAV longas.
+
+
 ## Versão 0.22.6 — em desenvolvimento
 
 Preparação experimental para até 16 WAV: validação de cabeçalhos PCM, estimativa de memória antes de descodificar e descodificação sequencial cancelável. Um teste OfflineAudioContext descodificou 16 WAV PCM curtas e alinhou os seus impulsos na mesma amostra após uma procura.

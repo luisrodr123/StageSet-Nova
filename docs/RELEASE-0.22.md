@@ -1,4 +1,6 @@
-# StageSet 0.22.4 — versão de teste
+# StageSet 0.22.7 — versão de teste
+
+Até 16 WAV PCM de duração igual e andamento 100% são agendadas no mesmo relógio de áudio, incluindo a pista principal. O mixer identifica este modo. A preparação recusa conjuntos cuja estimativa dos buffers descodificados exceda 512 MiB; a memória efetiva usada pode ser superior. Outros formatos ou mais de 16 pistas continuam em leitores independentes. O teste é com WAV curtas; validar ficheiros reais e interface de áudio antes de qualquer utilização ao vivo. MIDI, rede e loop não foram validados à amostra.
 
 Mute independente no master áudio, Click e SMPTE/LTC. A reprodução de pistas faz verificações no arranque e corrige deriva, mas continua sem garantia de sincronismo à amostra.
 
@@ -6,7 +8,7 @@ O ecrã inicial do Host Windows e Android foi compactado para apresentar pesquis
 
 O Host Windows e Android pode procurar computadores StageSet na rede, conservando a opção manual. Inclui faders independentes de click e SMPTE/LTC e marcadores de loop A/B alternáveis.
 
-**Limitação importante:** as pistas WAV ainda usam leitores independentes. Um teste isolado com 32 WAV silenciosas, pausa/retoma e procura observou desvios entre 7 e 38 ms, mas isto não garante sincronismo à amostra ou ausência de falhas noutras máquinas. Não confiar neste mecanismo para uma atuação sem ensaios e validação em equipamento real.
+**Limitação importante:** os conjuntos fora das condições indicadas usam leitores independentes. Os testes não garantem ausência de falhas noutras máquinas. Não confiar neste mecanismo para uma atuação sem ensaios e validação em equipamento real.
 
 Inclui visão geral e zoom nos mixers e mosaico, master MIDI/áudio, click BPM, indicadores e medidores, seleção múltipla de pistas, melhorias do show e do Host e correções no editor de letras. Ver o ficheiro STAGESET-ALTERACOES.md para o detalhe e as limitações.
 

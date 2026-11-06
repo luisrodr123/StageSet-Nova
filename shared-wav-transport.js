@@ -51,6 +51,7 @@ export class SharedWavTransport {
       if (this.sources !== sources || !this.playing) return;
       this.stopSources();
       this.offset = this.duration;
+      this.onended?.();
     };
   }
 
