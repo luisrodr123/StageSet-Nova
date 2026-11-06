@@ -23,7 +23,7 @@ struct HostView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text("StageSet Host").font(.largeTitle.bold()).foregroundStyle(.mint)
+                        Text("StageSet Host v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")").font(.largeTitle.bold()).foregroundStyle(.mint)
                         Text("Recetor de letras · iPhone e iPad")
                         Text("Endereço mostrado no StageSet")
                         TextField("http://192.168.1.20:4180", text: $address).textFieldStyle(.roundedBorder).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("server-address")

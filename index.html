@@ -46,7 +46,7 @@
           <span class="midi-activity" title="Atividade MIDI nas portas utilizadas pelo StageSet"><span id="midi-in-indicator">IN</span><span id="midi-out-indicator">OUT</span></span>
           <span class="connection-dot"></span>
           <span class="status-label">PRONTO</span>
-          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.22.0</span>
+          <button id="session-indicator" class="session-indicator" type="button" data-connected="false"><i class="session-led" aria-hidden="true"></i><span class="session-label">Rede desligada</span></button><span class="app-version" aria-label="Versão da aplicação">v0.22.1</span>
         </div>
       </header>
 
@@ -187,8 +187,8 @@
                 <button class="play-button" id="play" aria-label="Reproduzir" title="Reproduzir / pausar"><span id="play-glyph">▶</span></button>
               </div>
               <div class="transport-right">
-                <button class="transport-icon loop-mark" id="loop-in" data-studio-only aria-label="Marcar início do loop" title="Marcar início do loop" disabled>A</button>
-                <button class="transport-icon loop-mark" id="loop-out" data-studio-only aria-label="Marcar fim do loop" title="Marcar fim do loop" disabled>B</button>
+                <button class="transport-icon loop-mark" id="loop-in" data-studio-only aria-label="Marcar ou remover início do loop" title="Marcar ou remover início do loop" aria-pressed="false" disabled>A</button>
+                <button class="transport-icon loop-mark" id="loop-out" data-studio-only aria-label="Marcar ou remover fim do loop" title="Marcar ou remover fim do loop" aria-pressed="false" disabled>B</button>
                 <button class="transport-icon skip-button" id="forward" aria-label="Avançar 10 segundos" title="Avançar 10 segundos">↷<small>10</small></button>
                 <button class="transport-icon" id="next" aria-label="Próxima música" title="Próxima">▶|</button>
                 <span class="transport-separator"></span>
@@ -364,7 +364,7 @@
           <h2 id="audio-mixer-title">Mixer de áudio</h2>
           <p class="midi-mixer-description" id="audio-mixer-description">Controla volume, panorâmica, Solo e silêncio por canal.</p>
           <div class="audio-output-settings"><button id="choose-audio-output" type="button">Procurar interfaces</button><label for="audio-output-device">Dispositivo</label><select id="audio-output-device" aria-label="Interface áudio"><option value="default">Saída padrão</option></select><span id="audio-output-status">Saída do sistema · 1/2</span></div>
-          <div class="mixer-view-controls"><button class="backup-button" id="audio-mixer-overview" type="button" aria-pressed="false">Visão geral</button><label>Zoom dos canais <input id="audio-mixer-zoom" type="range" min="56" max="160" step="4" value="88" aria-label="Largura dos canais de áudio"></label><output id="audio-mixer-zoom-value"></output><button class="backup-button" id="audio-remove-selected" type="button" disabled>Remover pistas selecionadas</button><span>Seleciona pistas com ✓; Shift seleciona um intervalo.</span></div>
+          <div class="mixer-view-controls"><button class="backup-button" id="audio-mixer-overview" type="button" aria-pressed="false">Visão geral</button><label>Zoom dos canais <input id="audio-mixer-zoom" type="range" min="56" max="160" step="4" value="88" aria-label="Largura dos canais de áudio"></label><output id="audio-mixer-zoom-value"></output><label><input type="checkbox" id="show-click-strip" checked> Click</label><label><input type="checkbox" id="show-ltc-strip" checked> SMPTE</label><button class="backup-button" id="audio-remove-selected" type="button" disabled>Remover pistas selecionadas</button><span>Seleciona pistas com ✓; Shift seleciona um intervalo.</span></div>
           <div class="audio-mixer-list" id="audio-mixer-list"></div>
         </section>
       </div>

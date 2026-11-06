@@ -88,6 +88,7 @@ let audioOutputChannelCount = 2;
 let audioOutputDeviceId = localStorage.getItem("stageset-audio-output-device") ?? "";
 let audioOutputDeviceName = "Saída do sistema";
 let stemPlayers = [];
+let stemTransportGeneration = 0;
 let queueDelayTimer = null;
 let libraryClickTimer = null;
 let pitchGraphPromise = null;
@@ -312,6 +313,7 @@ function isPlaying() {
 }
 
 function disposeStemPlayers() {
+  stemTransportGeneration++;
   for (const player of stemPlayers) {
     player.audio.pause();
     try { player.source.disconnect(); player.gain.disconnect(); player.panner.disconnect(); player.outputSplitter.disconnect(); } catch {}
@@ -568,14 +570,22 @@ function syncStemPosition(force = false) {
 function startStemPlayers() {
   const song = selectedSong();
   if (!song || !stemPlayers.length) return;
+  const generation=++stemTransportGeneration, players=[...stemPlayers];
   syncStemPosition(true);
-  for (const player of stemPlayers) {
+  const attempts=players.map(player => {
     player.audio.playbackRate = song.tempo ?? 1;
-    player.audio.play().catch(() => toast(`Não foi possível reproduzir ${song.audioStems?.find((stem) => stem.id === player.id)?.name ?? "uma pista"}.`));
-  }
+    return player.audio.play();
+  });
+  void Promise.allSettled(attempts).then(results=>{
+    if(generation!==stemTransportGeneration||selectedSong()?.id!==song.id)return;
+    const failed=results.findIndex(result=>result.status==='rejected');
+    if(failed>=0){audio.pause();pauseStemPlayers();midiPlayer.pause();toast(`Não foi possível iniciar ${song.audioStems?.find(stem=>stem.id===players[failed].id)?.name??'uma pista'}; reprodução interrompida.`);return;}
+    syncStemPosition(true);
+  });
 }
 
 function pauseStemPlayers() {
+  stemTransportGeneration++;
   stemPlayers.forEach((player) => player.audio.pause());
 }
 
@@ -1034,6 +1044,12 @@ function renderAudioMixer() {
       updateButtons();
       container.append(row);
     }
+    for(const aux of [{id:'click',name:'CLICK',label:'Volume do click',value:getClickVolume(),set:setClickVolume},{id:'ltc',name:'SMPTE',label:'Volume SMPTE/LTC de saída',value:syncController?.getLtcVolume()??1,set:value=>syncController?.setLtcVolume(value)}]){
+      const row=document.createElement('div');row.className='audio-channel-row audio-aux-strip';row.dataset.aux=aux.id;
+      row.innerHTML=`<div class="audio-channel-label"><strong>${aux.name}</strong></div><label class="midi-mix-control audio-master-control"><span>${aux.label}</span><output></output><input type="range" min="0" max="1" step="0.01" aria-label="${aux.label}"></label>`;
+      const fader=row.querySelector('input'),value=row.querySelector('output');fader.value=String(aux.value);value.value=`${Math.round(aux.value*100)}%`;
+      fader.addEventListener('input',()=>{const level=Number(fader.value);aux.set(level);value.value=`${Math.round(level*100)}%`;});container.append(row);
+    }
     const master = document.createElement("div");
     master.className = "audio-channel-row audio-master-strip";
     master.innerHTML = `<div class="audio-channel-label"><strong>MASTER</strong><span>Saída principal</span></div><label class="midi-mix-control audio-master-control"><span>Volume geral</span><output>${Math.round(masterVolume * 100)}%</output><input type="range" min="0" max="1" step="0.01" value="${masterVolume}" aria-label="Fader master de áudio" /></label>`;
@@ -1046,6 +1062,7 @@ function renderAudioMixer() {
     });
     masterFader.addEventListener("change", () => dbPut(song).catch(() => toast("Não foi possível guardar o volume master.")));
     container.append(master);
+    updateAudioAuxVisibility();
     startAudioMeters(container);
   }).catch((error) => {
     container.innerHTML = "";
@@ -1056,6 +1073,9 @@ function renderAudioMixer() {
     toast(error.message || "Não foi possível abrir o mixer de áudio.");
   });
 }
+
+function updateAudioAuxVisibility(){const container=$('#audio-mixer-list');for(const id of ['click','ltc']){const checkbox=$(`#show-${id}-strip`),row=container.querySelector(`[data-aux="${id}"]`);if(row)row.hidden=!checkbox.checked;}const count=[...container.children].filter(row=>!row.hidden).length;if(count)container.style.setProperty('--audio-strip-count',String(count));}
+for(const id of ['click','ltc']){const checkbox=$(`#show-${id}-strip`),key=`stageset-show-${id}-strip`;checkbox.checked=localStorage.getItem(key)!=='false';checkbox.addEventListener('change',()=>{localStorage.setItem(key,String(checkbox.checked));updateAudioAuxVisibility();});}
 
 $('#audio-remove-selected').addEventListener('click', async () => {
   const song=selectedSong(); if(!song || song.id!==selectedStemSong || !selectedStemIds.size)return;
@@ -2110,6 +2130,8 @@ function renderLoopControls(song = selectedSong()) {
   $("#loop-toggle").disabled = !playable || !valid;
   $("#loop-in").classList.toggle("marked", Number.isFinite(song?.loopIn));
   $("#loop-out").classList.toggle("marked", Number.isFinite(song?.loopOut));
+  $("#loop-in").setAttribute("aria-pressed", String(Number.isFinite(song?.loopIn)));
+  $("#loop-out").setAttribute("aria-pressed", String(Number.isFinite(song?.loopOut)));
   $("#loop-toggle").classList.toggle("active-tool", active);
   $("#loop-toggle").setAttribute("aria-pressed", String(active));
   $("#loop-toggle").setAttribute("aria-label", active ? "Desativar loop" : "Ativar loop");
@@ -2121,6 +2143,10 @@ async function markLoopPoint(point) {
   if (!requireStudio()) return;
   const song = selectedSong();
   if (!song || isDocumentSong(song)) return toast("Escolhe uma faixa de áudio ou MIDI.");
+  if (Number.isFinite(point === 'in' ? song.loopIn : song.loopOut)) {
+    if(point==='in')song.loopIn=null;else song.loopOut=null;
+    song.loopEnabled=false;await dbPut(song);renderLoopControls(song);toast(`Ponto ${point==='in'?'A':'B'} removido; loop desligado.`);return;
+  }
   const position = currentPosition();
   if (point === "in") {
     song.loopIn = position;
@@ -4850,17 +4876,19 @@ function pulseMidiActivity(kind) {
   midiActivityTimers[kind] = setTimeout(() => indicator.classList.remove('active'), 150);
 }
 midiPlayer.onMidiSent = () => pulseMidiActivity('out');
-let clickContext, clickTimer = null;
+let clickContext, clickGain, clickTimer = null;
 const clickBpm = $('#click-bpm'), clickToggle = $('#click-toggle'), clickStatus = $('#click-status');
+function getClickVolume(){const value=Number(localStorage.getItem('stageset-click-volume')??1);return Number.isFinite(value)?Math.max(0,Math.min(1,value)):1;}
+function setClickVolume(value){const level=Math.max(0,Math.min(1,Number(value)||0));localStorage.setItem('stageset-click-volume',String(level));if(clickGain&&clickContext)clickGain.gain.setTargetAtTime(level,clickContext.currentTime,.01);}
 function stopClick() { clearInterval(clickTimer); clickTimer = null; clickToggle.setAttribute('aria-pressed','false'); clickToggle.textContent='Iniciar click'; clickStatus.textContent=''; }
 function clickBeat() {
   if (!clickContext || clickContext.state !== 'running') return;
   const now=clickContext.currentTime, oscillator=clickContext.createOscillator(), gain=clickContext.createGain();
   oscillator.frequency.value=1000;gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(.12,now+.004);gain.gain.exponentialRampToValueAtTime(.0001,now+.05);
-  oscillator.connect(gain).connect(clickContext.destination);oscillator.start(now);oscillator.stop(now+.055);
+  oscillator.connect(gain).connect(clickGain);oscillator.start(now);oscillator.stop(now+.055);
 }
 function scheduleClick() { clearInterval(clickTimer);const bpm=Math.max(20,Math.min(300,Number(clickBpm.value)||120));clickBpm.value=String(bpm);clickTimer=setInterval(clickBeat,60000/bpm);clickStatus.textContent=`${bpm} BPM`; }
-clickToggle.addEventListener('click',async()=>{if(clickTimer){stopClick();return;}try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)throw Error('Áudio indisponível');clickContext??=new Context();await clickContext.resume();scheduleClick();clickBeat();clickToggle.setAttribute('aria-pressed','true');clickToggle.textContent='Parar click';}catch(error){stopClick();clickStatus.textContent=error.message;}});
+clickToggle.addEventListener('click',async()=>{if(clickTimer){stopClick();return;}try{const Context=window.AudioContext||window.webkitAudioContext;if(!Context)throw Error('Áudio indisponível');if(!clickContext){clickContext=new Context();clickGain=clickContext.createGain();clickGain.gain.value=getClickVolume();clickGain.connect(clickContext.destination);}await clickContext.resume();scheduleClick();clickBeat();clickToggle.setAttribute('aria-pressed','true');clickToggle.textContent='Parar click';}catch(error){stopClick();clickStatus.textContent=error.message;}});
 clickBpm.addEventListener('change',()=>{if(clickTimer)scheduleClick();});
 
 document.addEventListener("keydown", (event) => {

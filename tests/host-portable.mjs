@@ -42,6 +42,7 @@ try{
  const target=await until(async()=> (await targets()).find(t=>t.url.endsWith('/desktop/host-home.html')),'Host home window');
  const home=await cdp(target.webSocketDebuggerUrl);
  await until(()=>evaluate(home,"!!document.getElementById('address')&&!!window.stageSetReceiver"),'address form and preload');
+ await until(()=>evaluate(home,`document.getElementById('version').textContent===${JSON.stringify('v'+version)}`),'visible version');
  const infoBrowser=await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();browser=await cdp(infoBrowser.webSocketDebuggerUrl);
  const {processInfo}=await browser.send('SystemInfo.getProcessInfo');
  const browserPid=processInfo.find(p=>p.type==='browser').id;

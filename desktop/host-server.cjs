@@ -9,11 +9,14 @@ class HostServer{
     this.code=randomBytes(6).toString('hex');this.root=root;this.url=(pfx?'https':'http')+'://'+address+':'+port;this.failures=new Map();
     const handler=(req,res)=>{void this.handle(req,res).catch(()=>{if(!res.headersSent)res.writeHead(400);res.end();});};
     this.server=pfx?https.createServer({pfx,passphrase},handler):http.createServer(handler);
-    await new Promise((resolve,reject)=>{this.server.once('error',reject);this.server.listen(port,address,resolve);});return {url:this.url,code:this.code,secure:!!pfx,hasPassword:!!this.access?.state.password};
+    await new Promise((resolve,reject)=>{this.server.once('error',reject);this.server.listen(port,address,resolve);});
+    try{this.discovery=await require('./host-discovery.cjs').advertise({port,secure:!!pfx,version:require('../package.json').version});}catch{this.discovery=null;}
+    return {url:this.url,code:this.code,secure:!!pfx,hasPassword:!!this.access?.state.password,discoveryAvailable:!!this.discovery};
   }
   async handle(req,res){
     const url=new URL(req.url,'http://local');res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
     const reply=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
+    if(url.pathname==='/api/info'&&req.method==='GET')return reply(200,{version:require('../package.json').version});
     if(url.pathname.startsWith('/api/')){
       if(req.method!=='POST')return reply(405,{});
       const origin=req.headers.origin;if(origin&&origin!==this.url)return reply(403,{error:'Origem não autorizada'});
@@ -78,6 +81,6 @@ class HostServer{
   list(){const now=Date.now();return [...this.clients.values()].filter(c=>now-c.seen<6000).map(({id,name,address,output})=>({id,name,address,output}));}
   assign(id,output){const client=[...this.clients.values()].find(c=>c.id===id);if(client){const changed=client.output!==output;client.output=output;client.key=null;client.wake?.();if(changed&&client.deviceId)return this.access?.assign(client.deviceId,output);}}
   revoke(){for(const client of this.clients.values())client.wake?.();this.clients.clear();}
-  async stop(){const server=this.server;this.server=null;for(const client of this.clients.values())client.wake?.();this.clients.clear();this.frames.clear();if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}}
+  async stop(){const server=this.server;this.server=null;if(this.discovery){try{this.discovery.close();}catch{}this.discovery=null;}for(const client of this.clients.values())client.wake?.();this.clients.clear();this.frames.clear();if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}}
 }
 module.exports={HostServer};

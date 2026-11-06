@@ -1,5 +1,15 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.1 — em desenvolvimento
+
+- Host Windows e Android: procura de computadores StageSet na rede local, com ligação por seleção e endereço manual como alternativa. A descoberta depende da rede e da firewall; o acesso continua a exigir autorização do StageSet. O Host web em iPad mantém ligação por endereço.
+- Número de versão visível no Host Windows, Android e na interface web.
+- A e B passam a alternar entre marcar e remover cada ponto; o terceiro botão ativa/desativa o loop.
+- Mixer de áudio com faders independentes de Click e SMPTE/LTC, que podem ser ocultados; o nível LTC controla apenas a emissão de áudio, não o MTC MIDI.
+- Arranque de pistas: ignora respostas de uma tentativa ultrapassada, volta a alinhar quando todas iniciam e interrompe o conjunto se uma das pistas falhar. A reprodução ainda usa leitores independentes e não oferece sincronismo à amostra garantido de 32 pistas; é necessária uma arquitetura com relógio de áudio partilhado e ensaios em equipamento real antes de utilização ao vivo.
+- Verificações: 33 testes automatizados e teste geral Electron passaram; teste isolado com 32 WAV silenciosas e três pausas/retomas observou desvios entre 0 e 16 ms. O APK Android compilou, sem teste físico. Descoberta validada em loopback; testar também em rede real.
+
+
 ## Versão 0.22.0 — preparação para teste
 
 - Inclui as alterações da série 0.21.1–0.21.8 e a opção de mostrar/ocultar eventos MIDI e DMX em cada ecrã de letras. A opção é guardada localmente por ecrã.

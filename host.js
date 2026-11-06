@@ -2,6 +2,7 @@ import {createHostSetlist} from './host-setlist.js';
 import {createLyricsScreen,renderScreenLines} from './lyrics-screen.js';
 import {applyBackground} from './backgrounds.js';
 import {receiverFrame,syncSettings} from './host-sync.js';
+const versionBadge=document.createElement('span');versionBadge.style.cssText='position:fixed;right:8px;bottom:6px;z-index:10;color:#a9bac8;background:#10141bcc;padding:4px;font:11px system-ui;pointer-events:none';document.body.append(versionBadge);fetch('./api/info',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(info=>{if(info?.version)versionBadge.textContent='v'+info.version;}).catch(()=>{});
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}};
 const store=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{}};
 let token='',frame=null,installPrompt,preferences=read('host-overlay',{}),mediaKey='',staticKey='',cursor='',receivedAt=0,age=0,rtt=0,failures=0;

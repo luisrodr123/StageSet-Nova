@@ -1,1 +1,1 @@
-const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('stageSetReceiver',{connect:address=>ipcRenderer.invoke('receiver:connect',address)});
+const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('stageSetReceiver',{connect:address=>ipcRenderer.invoke('receiver:connect',address),discover:()=>ipcRenderer.invoke('receiver:discover'),version:()=>ipcRenderer.invoke('receiver:version')});
