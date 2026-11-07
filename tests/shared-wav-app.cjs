@@ -13,14 +13,15 @@ async function main() {
   win = new BrowserWindow({ show: false, width: 1100, height: 800, webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false } });
   await win.loadURL(`http://127.0.0.1:${server.address().port}/`);
   const js = code => win.webContents.executeJavaScript(`(async()=>{${code}})()`, true);
-  await js(`window.clockStarts=[];const start=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(...args){clockStarts.push({when:args[0],offset:args[1],buffer:!!this.buffer});return start.apply(this,args)};document.getElementById('studio-mode-toggle').click();document.getElementById('studio-password-input').value='clock-test';document.getElementById('studio-password-confirm').value='clock-test';document.getElementById('studio-password-form').requestSubmit();`);
+  await js(`window.clockStarts=[];const connect=AudioNode.prototype.connect;AudioNode.prototype.connect=function(destination,...args){if(destination instanceof AudioDestinationNode){window.outputAnalyser=this.context.createAnalyser();connect.call(this,outputAnalyser);}return connect.call(this,destination,...args)};const start=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(...args){clockStarts.push({when:args[0],offset:args[1],buffer:!!this.buffer});return start.apply(this,args)};document.getElementById('studio-mode-toggle').click();document.getElementById('studio-password-input').value='clock-test';document.getElementById('studio-password-confirm').value='clock-test';document.getElementById('studio-password-form').requestSubmit();`);
   await wait(() => js(`return document.body.classList.contains('studio-mode')`), 'Studio indisponível');
-  await js(`document.getElementById('create-song').click();document.getElementById('new-song-name').value='16 WAV';const bytes=new ArrayBuffer(44+16000*10),v=new DataView(bytes),write=(offset,text)=>[...text].forEach((c,i)=>v.setUint8(offset+i,c.charCodeAt(0)));write(0,'RIFF');v.setUint32(4,bytes.byteLength-8,true);write(8,'WAVE');write(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,8000,true);v.setUint32(28,16000,true);v.setUint16(32,2,true);v.setUint16(34,16,true);write(36,'data');v.setUint32(40,bytes.byteLength-44,true);const dt=new DataTransfer();for(let i=0;i<16;i++)dt.items.add(new File([bytes],'pista-'+i+'.wav',{type:'audio/wav'}));const input=document.getElementById('new-song-files');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));`);
+  await js(`document.getElementById('create-song').click();document.getElementById('new-song-name').value='16 WAV';const bytes=new ArrayBuffer(44+16000*10),v=new DataView(bytes),write=(offset,text)=>[...text].forEach((c,i)=>v.setUint8(offset+i,c.charCodeAt(0)));write(0,'RIFF');v.setUint32(4,bytes.byteLength-8,true);write(8,'WAVE');write(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,8000,true);v.setUint32(28,16000,true);v.setUint16(32,2,true);v.setUint16(34,16,true);write(36,'data');v.setUint32(40,bytes.byteLength-44,true);for(let i=0;i<80000;i++)v.setInt16(44+i*2,Math.round(600*Math.sin(2*Math.PI*440*i/8000)),true);const dt=new DataTransfer();for(let i=0;i<16;i++)dt.items.add(new File([bytes],'pista-'+i+'.wav',{type:'audio/wav'}));const input=document.getElementById('new-song-files');input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));`);
   await wait(() => js(`return document.querySelector('.library-song') && !document.querySelector('#audio-mixer-button').hidden`), 'Música não criada');
   await delay(2500);
   for (let cycle = 0; cycle < 3; cycle++) {
     await js(`window.clockStarts=[];document.getElementById('play').click()`);
     await wait(() => js(`return clockStarts.filter(x=>x.buffer).length>=16`), 'Fontes WAV não arrancaram');
+    await wait(() => js(`if(!window.outputAnalyser)return false;const data=new Float32Array(outputAnalyser.fftSize);outputAnalyser.getFloatTimeDomainData(data);return data.some(value=>Math.abs(value)>0.001);`), 'As WAV arrancaram mas não chegou som à saída');
     const starts = await js(`return clockStarts.filter(x=>x.buffer).slice(0,16)`);
     if (starts.some(item => item.when !== starts[0].when || item.offset !== starts[0].offset)) throw Error('Pistas não partilham instante e posição: ' + JSON.stringify(starts));
     await delay(250);
@@ -44,7 +45,23 @@ async function main() {
   await wait(() => js(`return clockStarts.filter(x=>x.buffer).length>=16`), 'Retoma rápida não arrancou todas as pistas');
   await delay(250);
   if (await js(`return document.getElementById('audio').paused`)) throw Error('Retoma rápida ficou em pausa');
-  console.log('Aplicação: 16 WAV, pausas/retomas, procura, mixer e retoma rápida.');
+  await js(`document.getElementById('play').click();`);
+  await wait(() => js(`return document.getElementById('audio').paused`), 'Não foi possível pausar para marcar loop');
+  await js(`const p=document.getElementById('progress');p.value='200';p.dispatchEvent(new Event('input',{bubbles:true}));`);
+  await delay(300);
+  await js(`document.getElementById('loop-in').click()`);
+  await wait(() => js(`return document.getElementById('loop-in').getAttribute('aria-pressed')==='true'`), 'Ponto A não foi marcado');
+  await js(`const p=document.getElementById('progress');p.value='400';p.dispatchEvent(new Event('input',{bubbles:true}));`);
+  await delay(300);
+  await js(`document.getElementById('loop-out').click()`);
+  await wait(() => js(`return document.getElementById('loop-toggle').getAttribute('aria-pressed')==='true'`), 'Loop não ficou ativo');
+  await js(`const p=document.getElementById('progress');p.value='390';p.dispatchEvent(new Event('input',{bubbles:true}));`);
+  await delay(300);
+  await js(`window.clockStarts=[];document.getElementById('play').click()`);
+  await wait(() => js(`return clockStarts.filter(x=>x.buffer && Math.abs(x.offset-2)<.1).length>=16`), 'Loop não regressou ao ponto A com as 16 pistas');
+  const loopStarts = await js(`return clockStarts.filter(x=>x.buffer && Math.abs(x.offset-2)<.1).slice(-16)`);
+  if (loopStarts.some(item => item.when !== loopStarts[0].when || item.offset !== loopStarts[0].offset)) throw Error('Loop desalinhado: ' + JSON.stringify(loopStarts));
+  console.log('Aplicação: 16 WAV, pausas/retomas, procura, mixer, retoma rápida e loop.');
 }
 main().then(() => finish(0), error => { console.error(error); finish(1); });
 function finish(code) { if (win && !win.isDestroyed()) win.destroy(); if (server) server.close(); app.exit(code); }

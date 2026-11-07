@@ -1,6 +1,8 @@
-# StageSet 0.22.7 — versão de teste
+# StageSet 0.22.8 — versão de teste
 
-Até 16 WAV PCM de duração igual e andamento 100% são agendadas no mesmo relógio de áudio, incluindo a pista principal. O mixer identifica este modo. A preparação recusa conjuntos cuja estimativa dos buffers descodificados exceda 512 MiB; a memória efetiva usada pode ser superior. Outros formatos ou mais de 16 pistas continuam em leitores independentes. O teste é com WAV curtas; validar ficheiros reais e interface de áudio antes de qualquer utilização ao vivo. MIDI, rede e loop não foram validados à amostra.
+Corrige o bloqueio de leitura quando as WAV não satisfazem as condições do relógio partilhado: a aplicação volta ao modo de leitores independentes e apresenta o motivo no mixer. Se faltar algum ficheiro de pista, identifica-o e impede a reprodução parcial. O modo independente exige verificação do sincronismo.
+
+Até 16 WAV PCM de duração igual e andamento 100% são agendadas no mesmo relógio de áudio, incluindo a pista principal. O mixer identifica este modo. Quando a estimativa dos buffers descodificados excede 512 MiB, é usado o modo independente; a memória efetiva usada pode ser superior. Outros formatos ou mais de 16 pistas continuam em leitores independentes. Foram testadas WAV curtas no modo partilhado e 16 WAV sintéticas de quatro minutos a 8 kHz no modo independente. Validar ficheiros reais e interface de áudio antes de qualquer utilização ao vivo. MIDI, rede e precisão do loop não foram validados à amostra.
 
 Mute independente no master áudio, Click e SMPTE/LTC. A reprodução de pistas faz verificações no arranque e corrige deriva, mas continua sem garantia de sincronismo à amostra.
 

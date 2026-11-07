@@ -96,6 +96,7 @@ let sharedWavAbort = null;
 let sharedWavRequired = false;
 let sharedWavError = '';
 let sharedWavPreparing = false;
+let sharedWavFallbackReason = '';
 let stemTransportGeneration = 0;
 let stemSyncTimer = null;
 let lastStemSyncAt = 0;
@@ -328,7 +329,7 @@ function disposeStemPlayers() {
   sharedWavAbort?.abort(); sharedWavAbort = null;
   sharedWavTransport?.stop(); sharedWavTransport = null;
   sharedWavInput?.disconnect(); sharedWavInput = null;
-  sharedWavRequired = false; sharedWavError = ''; sharedWavPreparing = false;
+  sharedWavRequired = false; sharedWavError = ''; sharedWavPreparing = false; sharedWavFallbackReason = '';
   if (pitchSource && audioMixerSplitter) { try { pitchSource.disconnect(); pitchSource.connect(audioMixerSplitter); } catch {} }
   stemTransportGeneration++;
   clearInterval(stemSyncTimer);stemSyncTimer=null;
@@ -536,6 +537,14 @@ async function connectAudioStems(song) {
   disposeStemPlayers();
   if (!song?.audioStems?.length || isMidiSong(song) || isDocumentSong(song)) return;
   await ensureAudioMixerGraph(song, true);
+  const missingStems = song.audioStems.filter(stem => !(stem.blob instanceof Blob));
+  if (missingStems.length) {
+    sharedWavRequired = true;
+    sharedWavError = `Ficheiros de pistas em falta: ${missingStems.map(stem => stem.name || stem.fileName || 'sem nome').join(', ')}. Volta a importá-los.`;
+    pitchSource.disconnect();
+    toast(sharedWavError);
+    return;
+  }
   for (const stem of song.audioStems.slice(0, 31)) {
     if (!(stem.blob instanceof Blob)) continue;
     const element = new Audio();
@@ -593,7 +602,18 @@ async function connectAudioStems(song) {
     } catch (error) {
       if (controller.signal.aborted || sharedWavAbort !== controller) return;
       sharedWavError = error.message || 'Não foi possível preparar as WAV sincronizadas.';
-      toast(sharedWavError);
+      sharedWavTransport?.stop(); sharedWavTransport = null;
+      sharedWavInput?.disconnect(); sharedWavInput = null;
+      try {
+        pitchSource.disconnect(); pitchSource.connect(audioMixerSplitter);
+        sharedWavRequired = false;
+        sharedWavFallbackReason = sharedWavError;
+        toast('Relógio partilhado indisponível. Pistas prontas no modo independente; verifica o sincronismo.');
+      } catch {
+        sharedWavRequired = true;
+        sharedWavError = 'Não foi possível preparar a saída de áudio. Volta a selecionar a música.';
+        toast(sharedWavError);
+      }
     } finally {
       if (sharedWavAbort === controller) { sharedWavPreparing = false; applyStemMix(song); }
     }
@@ -624,7 +644,7 @@ function syncStemPosition(force = false) {
 
 function startStemPlayers() {
   const song = selectedSong();
-  if (!song || !stemPlayers.length) return;
+  if (!song) return;
   if (sharedWavRequired) {
     if (!sharedWavTransport) { audio.pause(); midiPlayer.pause(); toast(sharedWavPreparing ? 'As WAV sincronizadas ainda estão a carregar.' : sharedWavError || 'Não foi possível preparar as WAV.'); return; }
     try {
@@ -633,6 +653,7 @@ function startStemPlayers() {
     } catch (error) { audio.pause(); midiPlayer.pause(); toast(error.message || 'Não foi possível iniciar as WAV sincronizadas.'); }
     return;
   }
+  if (!stemPlayers.length) return;
   if(stemPlayers.some(player=>player.audio.readyState<1||!Number.isFinite(player.audio.duration))){audio.pause();pauseStemPlayers();midiPlayer.pause();toast('As pistas ainda estão a carregar. Aguarda e volta a iniciar.');return;}
   const generation=++stemTransportGeneration, players=[...stemPlayers];
   syncStemPosition(true);
@@ -971,7 +992,7 @@ function renderAudioMixer() {
         ? `Este áudio contém ${channelCount} canais mono separados. Ajusta cada canal durante a reprodução.`
         : channelCount === 1 ? "Controla o volume e a panorâmica deste canal mono." : "Controla separadamente os canais mono esquerdo e direito deste ficheiro de áudio.";
     if (sharedWavRequired) $("#audio-mixer-description").textContent += sharedWavTransport ? ' · WAV: relógio partilhado (até 16 pistas, andamento 100%).' : ` · WAV: ${sharedWavPreparing ? 'a preparar' : sharedWavError || 'indisponível'}.`;
-    else if (song.audioStems?.length) $("#audio-mixer-description").textContent += ' · Pistas em leitores independentes; o relógio partilhado requer até 16 ficheiros WAV PCM.';
+    else if (song.audioStems?.length) $("#audio-mixer-description").textContent += ` · Pistas em leitores independentes; ${sharedWavFallbackReason ? 'relógio partilhado indisponível: ' + sharedWavFallbackReason : 'o relógio partilhado requer até 16 ficheiros WAV PCM.'}`;
     for (let channel = 0; channel < controlCount; channel++) {
       const setting = settings[channel];
       const channelNumber = String(channel + 1).padStart(2, "0");

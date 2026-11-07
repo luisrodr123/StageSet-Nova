@@ -1,5 +1,12 @@
 # StageSet — alterações anotadas
 
+## Versão 0.22.8 — em desenvolvimento
+
+Corrigido bloqueio da leitura de pistas quando as WAV têm durações diferentes, o andamento não é 100%, não são suportadas pelo descodificador sincronizado ou o limite estimado de memória é excedido. Quando possível, a aplicação volta a ligar o áudio e usa leitores independentes; o mixer mostra o motivo e avisa que o sincronismo deve ser verificado. Pistas com ficheiros ausentes são identificadas e a reprodução parcial é impedida.
+
+Verificação de som: numa sessão Electron isolada com duas WAV de frequências e durações diferentes, as duas frequências chegaram ao sinal de saída e a pausa parou ambas. Com 16 WAV curtas no relógio partilhado, foi detetado sinal na saída e foram testadas pausas, procura, retoma e o regresso conjunto ao ponto A do loop. Um teste com 16 WAV sintéticas de quatro minutos a 8 kHz verificou reprodução, saída e pausa no modo independente. O modo independente não garante alinhamento à amostra; a precisão do loop e do MIDI não foi validada à amostra. Testar os ficheiros e a interface reais antes de uma atuação.
+
+
 ## Versão 0.22.7 — em desenvolvimento
 
 Integração de teste: músicas com 2 a 16 WAV PCM (incluindo a principal), com a mesma duração e andamento a 100%, são preparadas e agendadas no mesmo relógio Web Audio. O mixer indica quando o relógio partilhado está ativo. Quando a preparação falha ou a estimativa de áudio descodificado ultrapassa 512 MiB, o conjunto não arranca parcialmente. Pausar, retomar e procurar reagendam as pistas em conjunto; adicionar ou remover pistas exige pausa.
